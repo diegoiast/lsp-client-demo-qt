@@ -1,4 +1,5 @@
 #pragma once
+
 #include <QMainWindow>
 #include <QListWidget>
 #include <QTabWidget>
@@ -9,6 +10,7 @@
 #include <QLineEdit>
 #include <QStringList>
 #include <QVBoxLayout>
+#include "LspClientImpl.hpp"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,6 +31,8 @@ private:
     QLineEdit* showEdit;
     QString projectDir;
     QStringList allFiles;
+    
+    LspClientImpl lspClient;
 
     void openDirectory();
     void loadFiles(const QString& dirPath);

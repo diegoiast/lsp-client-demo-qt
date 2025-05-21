@@ -62,6 +62,7 @@ MainWindow::MainWindow(QWidget* parent)
     closeTabShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_W), this);
     connect(closeTabShortcut, &QShortcut::activated, this, &MainWindow::closeCurrentTab);
 
+    lspClient.startClangd();
     openDirectory();
 }
 
@@ -71,6 +72,8 @@ void MainWindow::openDirectory() {
         projectDir = dir;
         loadFiles(dir);
         dock->setWindowTitle(tr("Project: %1").arg(QFileInfo(dir).fileName()));
+        
+        lspClient.setDocumentRoot(projectDir.toStdString());
     }
 }
 
