@@ -141,6 +141,10 @@ void MainWindow::openFileInTab(const QString& relPath) {
     editor->setReadOnly(false);
     auto tabIdx = tabWidget->addTab(editor, relPath);
     tabWidget->setCurrentIndex(tabIdx);
+    
+    auto contents = text.toStdString();
+    auto path = (projectDir + relPath).toStdString();
+    lspClient.openDocument(path, contents);
 }
 
 void MainWindow::onOpenDirClicked() {

@@ -57,6 +57,22 @@ void LspClientImpl::setDocumentRoot(const std::string &newRoot) {
     initializeLspServer();
 }
 
+void LspClientImpl::openDocument(const std::string &fileName, const std::string &fileContents)
+{
+    // When opening a file:
+    static lsp::notifications::TextDocument_DidOpen::Params params{
+        .textDocument = {
+            .uri = "file://" + fileName, 
+            .languageId = "cpp", // or "c", "python", etc.
+            .version = 1, 
+            .text = fileContents // The full text of the opened file
+        }
+    };
+    
+    m_messageHandler->sendNotification<lsp::notifications::TextDocument_DidOpen>(std::move(params));
+
+}
+
 LspClientImpl::~LspClientImpl() {
     shutdownLspServer();
     stopClangd();

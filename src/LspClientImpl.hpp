@@ -25,6 +25,7 @@ class LspClientImpl {
     LspClientImpl &operator=(LspClientImpl &&) = delete;
 
     void setDocumentRoot(const std::string &documentRoot);
+    void openDocument(const std::string &fileName, const std::string &fileContents);
     
     void startClangd();
     void stopClangd();
