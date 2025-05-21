@@ -1,7 +1,7 @@
-qt_add_executable(qt6_dir_viewer
+qt_add_executable(lsp_client_demo_qt
     main.cpp
     mainwindow.cpp
     mainwindow.hpp
 )
 
-target_link_libraries(qt6_dir_viewer PRIVATE Qt6::Widgets)
+target_link_libraries(lsp_client_demo_qt PRIVATE Qt6::Widgets lsp)
