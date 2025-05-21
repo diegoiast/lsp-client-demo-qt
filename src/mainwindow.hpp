@@ -10,6 +10,9 @@
 #include <QLineEdit>
 #include <QStringList>
 #include <QVBoxLayout>
+#include <QTextEdit>
+
+#include "AppOutputRedirector.hpp"
 #include "LspClientImpl.hpp"
 
 class MainWindow : public QMainWindow {
@@ -31,9 +34,13 @@ private:
     QLineEdit* showEdit;
     QString projectDir;
     QStringList allFiles;
+    QDockWidget* outputDock;
+    QTextEdit* outputEdit;
     
+    
+    AppOutputRedirector* outputRedirector = nullptr;
     LspClientImpl lspClient;
-
+    
     void openDirectory();
     void loadFiles(const QString& dirPath);
     void addFilesRecursive(const QString& baseDir, const QString& currentDir, QStringList& files);
@@ -41,6 +48,8 @@ private:
     void closeDirectory();
     void closeCurrentTab();
     void updateFileList();
+    void appendStdout(const QString& text);
+    void appendStderr(const QString& text);
 
 private slots:
     void onSidebarItemClicked(QListWidgetItem* item);

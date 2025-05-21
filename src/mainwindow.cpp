@@ -53,6 +53,19 @@ MainWindow::MainWindow(QWidget* parent)
     closeDirAction = toolbar->addAction(tr("Close Dir"));
     closeTabAction = toolbar->addAction(tr("Close Tab"));
     quitAction = toolbar->addAction(tr("Quit"));
+    
+    outputEdit = new QTextEdit(this);
+    outputEdit->setReadOnly(true);
+    outputEdit->setAcceptRichText(false); 
+    
+    outputDock = new QDockWidget(tr("Output"), this);
+    outputDock->setWidget(outputEdit);
+    addDockWidget(Qt::RightDockWidgetArea, outputDock);
+    
+    outputRedirector = new AppOutputRedirector(this);
+    connect(outputRedirector, &AppOutputRedirector::newStdout, this, &MainWindow::appendStdout);
+    connect(outputRedirector, &AppOutputRedirector::newStderr, this, &MainWindow::appendStderr);
+
 
     connect(openDirAction, &QAction::triggered, this, &MainWindow::onOpenDirClicked);
     connect(closeDirAction, &QAction::triggered, this, &MainWindow::onCloseDirClicked);
@@ -179,4 +192,18 @@ void MainWindow::updateFileList() {
             continue;
         sidebar->addItem(rel);
     }
+}
+
+void MainWindow::appendStdout(const QString& text) {
+    outputEdit->moveCursor(QTextCursor::End);
+    QString html = "<span style=\"color:blue;\">" + text.toHtmlEscaped().replace("\n", "<br/>") + "</span>";
+    outputEdit->insertHtml(html);
+    outputEdit->moveCursor(QTextCursor::End);
+}
+
+void MainWindow::appendStderr(const QString& text) {
+    outputEdit->moveCursor(QTextCursor::End);
+    QString html = "<span style=\"color:red;\">" + text.toHtmlEscaped().replace("\n", "<br/>") + "</span>";
+    outputEdit->insertHtml(html);
+    outputEdit->moveCursor(QTextCursor::End);
 }
