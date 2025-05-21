@@ -1,0 +1,8 @@
+cbuild/
+build/
+dist/
+out/
+CMakeLists.txt.user
+.vs/
+.cache/
+lib/*
