@@ -28,6 +28,7 @@ class LspClientImpl {
 
     void setDocumentRoot(const std::string &documentRoot);
     void openDocument(const std::string &fileName, const std::string &fileContents);
+    void hover(const std::string &fileName, int line, int column, std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback);
     
     void startClangd();
     void stopClangd();

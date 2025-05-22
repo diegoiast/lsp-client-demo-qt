@@ -1,9 +1,7 @@
-#include "mainwindow.hpp"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QDir>
-#include <QPlainTextEdit>
 #include <QListWidgetItem>
 #include <QFile>
 #include <QTextStream>
@@ -13,6 +11,9 @@
 #include <QDockWidget>
 #include <QLabel>
 #include <QRegularExpression>
+
+#include "mainwindow.hpp"
+#include "CodeEditor.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -38,7 +39,6 @@ MainWindow::MainWindow(QWidget* parent)
     dockLayout->addWidget(excludeEdit);
     dockLayout->addWidget(showLabel);
     dockLayout->addWidget(showEdit);
-    // dockLayout->addStretch();
 
     dock = new QDockWidget(tr("Project Files"), this);
     dock->setWidget(dockWidget);
@@ -146,14 +146,34 @@ void MainWindow::openFileInTab(const QString& relPath) {
         return;
     QTextStream in(&file);
     auto text = in.readAll();
-    auto editor = new QPlainTextEdit;
+    auto editor = new CodeEditor;
+    auto path = (projectDir + relPath).toStdString();
+    
     editor->setPlainText(text);
     editor->setReadOnly(false);
+    connect(editor, &CodeEditor::hoveredWordTooltip, editor, [path, this](const QString& word, int line, int column, const QPoint& globalPos){
+        Q_UNUSED(globalPos);
+        // lspClient.hover(path, line, column, [](std::function<void(lsp::requests::TextDocument_Hover::Result &&)> result) {
+        lspClient.hover(path, line, column, [line, column, word](auto result) {
+            if (result.isNull()) {
+                qDebug() << QString("FAIL - Line=%1, colum=%2, pos=%4, word=%3").arg(line).arg(column).arg(word);
+                return;
+            }
+            qDebug() << QString("OK - Line=%1, colum=%2, pos=%4, word=%3").arg(line).arg(column).arg(word);
+
+            using T = std::decay_t<decltype(result)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                qDebug() << result << std::endl;
+            } else if constexpr (std::is_same_v<T, lsp::MarkupContent>) {
+                qDebug() << "Kind: " << (int) result.kind << "\nValue: " << result.value << std::endl;
+            }
+        });
+    });
+    
     auto tabIdx = tabWidget->addTab(editor, relPath);
     tabWidget->setCurrentIndex(tabIdx);
     
     auto contents = text.toStdString();
-    auto path = (projectDir + relPath).toStdString();
     lspClient.openDocument(path, contents);
 }
 

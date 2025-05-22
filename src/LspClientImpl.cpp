@@ -79,9 +79,28 @@ void LspClientImpl::openDocument(const std::string &fileName, const std::string 
             .text = fileContents // The full text of the opened file
         }
     };
-    
     m_messageHandler->sendNotification<lsp::notifications::TextDocument_DidOpen>(std::move(params));
 
+}
+
+void LspClientImpl::hover(const std::string &fileName, int line, int column, std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback)
+{
+    lsp::HoverParams params;
+    params.textDocument.uri = std::string("file://") + fileName;
+    params.position.line = line;
+    params.position.character = column;
+    // params.workDoneToken
+    
+    // params
+    m_messageHandler->sendRequest<lsp::requests::TextDocument_Hover>(
+        std::move(params),
+        [callback](lsp::requests::TextDocument_Hover::Result &&result) {
+            callback(std::move(result));
+        },
+        [](const lsp::Error &error) {
+            std::cerr << "Failed to get response from LSP server: " << error.what() << std::endl;
+        }   
+    );
 }
 
 LspClientImpl::~LspClientImpl() {
@@ -114,6 +133,8 @@ void LspClientImpl::stopClangd() {
     if (m_workerThread.joinable()) {
         m_workerThread.join();
     }
+    delete clangdProcess;
+    clangdProcess = nullptr;
 }
 
 void LspClientImpl::initializeLspServer() {
