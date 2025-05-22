@@ -52,6 +52,9 @@ MainWindow::MainWindow(QWidget* parent)
     openDirAction = toolbar->addAction(tr("Open Dir"));
     closeDirAction = toolbar->addAction(tr("Close Dir"));
     closeTabAction = toolbar->addAction(tr("Close Tab"));
+    showDebugAction = toolbar->addAction(tr("Debug"));
+    showDebugAction->setCheckable(true);
+    clearDebugAction = toolbar->addAction(tr("Clear Debug"));
     quitAction = toolbar->addAction(tr("Quit"));
     
     outputEdit = new QTextEdit(this);
@@ -71,6 +74,13 @@ MainWindow::MainWindow(QWidget* parent)
     connect(closeDirAction, &QAction::triggered, this, &MainWindow::onCloseDirClicked);
     connect(closeTabAction, &QAction::triggered, this, &MainWindow::onCloseTabClicked);
     connect(quitAction, &QAction::triggered, this, &MainWindow::onQuitClicked);
+    connect(showDebugAction, &QAction::toggled, this, [this](bool toggled){
+        qDebug() << "Toggle debug = " << toggled;
+        this->lspClient.debugIO(toggled);
+    });
+    connect(clearDebugAction, &QAction::triggered, this, [this](bool toggled){
+        this->outputEdit->clear();
+    });
 
     closeTabShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_W), this);
     connect(closeTabShortcut, &QShortcut::activated, this, &MainWindow::closeCurrentTab);

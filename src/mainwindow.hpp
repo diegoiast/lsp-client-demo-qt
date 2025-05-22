@@ -28,6 +28,8 @@ private:
     QAction* closeDirAction;
     QAction* quitAction;
     QAction* closeTabAction;
+    QAction* showDebugAction;
+    QAction* clearDebugAction;
     QShortcut* closeTabShortcut;
     QDockWidget* dock;
     QLineEdit* excludeEdit;

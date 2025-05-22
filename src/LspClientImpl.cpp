@@ -13,6 +13,8 @@
 // internal class
 class QProcessStream : public lsp::io::Stream {
 public:
+    bool debugIO  = false;
+    
     explicit QProcessStream(QProcess* process)
         : m_process(process)
     {
@@ -30,7 +32,9 @@ public:
             if (bytesRead <= 0) {
                 throw std::runtime_error("Failed to read from QProcess");
             }
-
+            if (debugIO) {
+                std::cerr << "Read bytes " << size << ": " << std::string(buffer, size) << std::endl;
+            }
             totalRead += bytesRead;
         }
     }
@@ -40,7 +44,9 @@ public:
         if (bytesWritten < 0) {
             throw std::runtime_error("Failed to write to QProcess");
         }
-
+        if (debugIO) {
+            std::cerr << "Wrote bytes " << size << ": " << std::string(buffer, size) << std::endl;
+        }
         if (!m_process->waitForBytesWritten(1)) {
             throw std::runtime_error("Timeout writing to QProcess");
         }
@@ -51,6 +57,11 @@ private:
 };
 
 LspClientImpl::LspClientImpl() {}
+
+void LspClientImpl::debugIO(bool enable) {
+    auto io = dynamic_cast<QProcessStream*>(this->m_clandIO.get());
+    io->debugIO = enable;
+}
 
 void LspClientImpl::setDocumentRoot(const std::string &newRoot) {
     m_documentRoot = newRoot;
@@ -113,15 +124,21 @@ void LspClientImpl::initializeLspServer() {
     auto id = m_messageHandler->sendRequest<lsp::requests::Initialize>(
         lsp::requests::Initialize::Params{/* parameters */},
         [](lsp::requests::Initialize::Result &&result) {
-            std::cerr << " - Server initialized successfully\n";
+            std::cout << " - Server initialized successfully\n";
             if (result.capabilities.textDocumentSync.has_value()) {
-                std::cerr << " - Text document sync supported\n";
+                std::cout << " - Text document sync supported\n";
             }
             if (result.capabilities.completionProvider.has_value()) {
-                std::cerr << " - Completion provider supported\n";
+                std::cout << " - Completion provider supported\n";
             }
             if (result.capabilities.hoverProvider.has_value()) {
-                std::cerr << " - Hover provider supported\n";
+                std::cout << " - Hover provider supported\n";
+            }
+            if (result.capabilities.documentHighlightProvider.has_value()) {
+                std::cout << " - Document highlight provider provider supported\n";
+            }
+            if (result.capabilities.renameProvider.has_value()) {
+                std::cout << " - Rename provider provider supported\n";
             }
         },
         [](const lsp::Error &error) {
