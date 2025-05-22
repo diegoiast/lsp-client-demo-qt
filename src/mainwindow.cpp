@@ -11,6 +11,8 @@
 #include <QDockWidget>
 #include <QLabel>
 #include <QRegularExpression>
+#include <QToolTip>
+#include <QTimer>
 
 #include "mainwindow.hpp"
 #include "CodeEditor.hpp"
@@ -153,20 +155,22 @@ void MainWindow::openFileInTab(const QString& relPath) {
     editor->setReadOnly(false);
     connect(editor, &CodeEditor::hoveredWordTooltip, editor, [path, this](const QString& word, int line, int column, const QPoint& globalPos){
         Q_UNUSED(globalPos);
-        // lspClient.hover(path, line, column, [](std::function<void(lsp::requests::TextDocument_Hover::Result &&)> result) {
-        lspClient.hover(path, line, column, [line, column, word](auto result) {
-            if (result.isNull()) {
-                qDebug() << QString("FAIL - Line=%1, colum=%2, pos=%4, word=%3").arg(line).arg(column).arg(word);
-                return;
-            }
-            qDebug() << QString("OK - Line=%1, colum=%2, pos=%4, word=%3").arg(line).arg(column).arg(word);
-
-            using T = std::decay_t<decltype(result)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                qDebug() << result << std::endl;
-            } else if constexpr (std::is_same_v<T, lsp::MarkupContent>) {
-                qDebug() << "Kind: " << (int) result.kind << "\nValue: " << result.value << std::endl;
-            }
+        lspClient.hover(path, line, column, [line, column, word, this, globalPos](auto result) {
+            QTimer::singleShot(0, this, [globalPos, this, column, word, line, result](){
+                if (result.isNull()) {
+                    QToolTip::hideText();
+                    return;
+                }
+                auto tooltip = QString("OK - Line=%1, colum=%2, pos=%4, word=%3").arg(line).arg(column).arg(word);
+                
+                using T = std::decay_t<decltype(result->contents)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    tooltip = QString::fromStdString(result->content);
+                } else if constexpr (std::is_same_v<T, lsp::MarkupContent>) {
+                    tooltip = QString::fromStdString(result->value);
+                }
+                QToolTip::showText(globalPos, tooltip,  this);
+            });
         });
     });
     
@@ -213,7 +217,7 @@ void MainWindow::updateFileList() {
         excludeList = excludeStr.split(';', Qt::SkipEmptyParts);
 
     for (const auto& rel : allFiles) {
-        bool excluded = false;
+        auto excluded = false;
         for (const auto& ex : excludeList) {
             if (!ex.trimmed().isEmpty() && rel.contains(ex.trimmed(), Qt::CaseInsensitive)) {
                 excluded = true;
@@ -230,14 +234,14 @@ void MainWindow::updateFileList() {
 
 void MainWindow::appendStdout(const QString& text) {
     outputEdit->moveCursor(QTextCursor::End);
-    QString html = "<span style=\"color:blue;\">" + text.toHtmlEscaped().replace("\n", "<br/>") + "</span>";
+    auto html = QString("<span style=\"color:blue;\">") + text.toHtmlEscaped().replace("\n", "<br/>") + "</span>";
     outputEdit->insertHtml(html);
     outputEdit->moveCursor(QTextCursor::End);
 }
 
 void MainWindow::appendStderr(const QString& text) {
     outputEdit->moveCursor(QTextCursor::End);
-    QString html = "<span style=\"color:red;\">" + text.toHtmlEscaped().replace("\n", "<br/>") + "</span>";
+    auto html = QString("<span style=\"color:red;\">") + text.toHtmlEscaped().replace("\n", "<br/>") + "</span>";
     outputEdit->insertHtml(html);
     outputEdit->moveCursor(QTextCursor::End);
 }
