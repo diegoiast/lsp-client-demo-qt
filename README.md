@@ -1,4 +1,4 @@
-# LSP cliet demo for Qt 
+# LSP client demo for Qt 
 
 This repo shows how to use [LSP framework](https://github.com/leon-bckl/lsp-framework)
 to connect your application to an LSP server (like clangd).
