@@ -5,7 +5,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include <lsp/io/stream.h>
 #include <lsp/connection.h>
