@@ -17,6 +17,11 @@
 #include "mainwindow.hpp"
 #include "CodeEditor.hpp"
 
+template<typename Func>
+void runOnUiThread(Func&& func) {
+    QMetaObject::invokeMethod(qApp, std::forward<Func>(func), Qt::QueuedConnection);
+}
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
@@ -71,7 +76,6 @@ MainWindow::MainWindow(QWidget* parent)
     connect(outputRedirector, &AppOutputRedirector::newStdout, this, &MainWindow::appendStdout);
     connect(outputRedirector, &AppOutputRedirector::newStderr, this, &MainWindow::appendStderr);
 
-
     connect(openDirAction, &QAction::triggered, this, &MainWindow::onOpenDirClicked);
     connect(closeDirAction, &QAction::triggered, this, &MainWindow::onCloseDirClicked);
     connect(closeTabAction, &QAction::triggered, this, &MainWindow::onCloseTabClicked);
@@ -94,7 +98,7 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::openDirectory() {
     auto dir = QFileDialog::getExistingDirectory(this, tr("Open Project Directory"));
     if (!dir.isEmpty()) {
-        projectDir = dir;
+        projectDir = dir + "/";
         loadFiles(dir);
         dock->setWindowTitle(tr("Project: %1").arg(QFileInfo(dir).fileName()));
         
@@ -153,23 +157,44 @@ void MainWindow::openFileInTab(const QString& relPath) {
     
     editor->setPlainText(text);
     editor->setReadOnly(false);
-    connect(editor, &CodeEditor::hoveredWordTooltip, editor, [path, this](const QString& word, int line, int column, const QPoint& globalPos){
+    connect(editor, &CodeEditor::hoveredWordTooltip, editor, [path, this, editor](const QString& word, int line, int column, const QPoint& globalPos){
         Q_UNUSED(globalPos);
-        lspClient.hover(path, line, column, [line, column, word, this, globalPos](auto result) {
-            QTimer::singleShot(0, this, [globalPos, this, column, word, line, result](){
+        lspClient.hover(path, line, column, [line, column, word, this, globalPos, editor](auto result) {
+            runOnUiThread([=](){
                 if (result.isNull()) {
                     QToolTip::hideText();
                     return;
                 }
-                auto tooltip = QString("OK - Line=%1, colum=%2, pos=%4, word=%3").arg(line).arg(column).arg(word);
+                auto tooltip = QString("OK - Line=%1, column=%2, word=%3").arg(line).arg(column).arg(word);        
+                auto &contents = result->contents;        
+                std::visit([&](const auto& value) {
+                    using T = std::decay_t<decltype(value)>;
+            
+                    if constexpr (std::is_same_v<T, lsp::MarkupContent>) {
+                        tooltip = QString::fromStdString(value.value);
+                    } else if constexpr (std::is_same_v<T, std::string>) {
+                        tooltip = QString::fromStdString(value);
+                    } else if constexpr (std::is_same_v<T, lsp::MarkedString_Language_Value>) {
+                        tooltip = QString("[%1] %2").arg(QString::fromStdString(value.language),
+                                                         QString::fromStdString(value.value));
+                    } else if constexpr (std::is_same_v<T, std::vector<lsp::MarkedString>>) {
+                        QStringList parts;
+                        for (const auto& item : value) {
+                            std::visit([&](const auto& inner) {
+                                using InnerT = std::decay_t<decltype(inner)>;
+                                if constexpr (std::is_same_v<InnerT, std::string>) {
+                                    parts << QString::fromStdString(inner);
+                                } else if constexpr (std::is_same_v<InnerT, lsp::MarkedString_Language_Value>) {
+                                    parts << QString("[%1] %2").arg(QString::fromStdString(inner.language),
+                                                                    QString::fromStdString(inner.value));
+                                }
+                            }, item);
+                        }
+                        tooltip = parts.join("\n");
+                    }
+                }, contents);           
                 
-                using T = std::decay_t<decltype(result->contents)>;
-                if constexpr (std::is_same_v<T, std::string>) {
-                    tooltip = QString::fromStdString(result->content);
-                } else if constexpr (std::is_same_v<T, lsp::MarkupContent>) {
-                    tooltip = QString::fromStdString(result->value);
-                }
-                QToolTip::showText(globalPos, tooltip,  this);
+                QToolTip::showText(globalPos, tooltip, editor, {}, 5000);
             });
         });
     });

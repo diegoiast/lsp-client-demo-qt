@@ -1,10 +1,7 @@
 #include <QProcess>
-#include <QSocketNotifier>
-#include <QThread>
+
 #include <cstring>
-#include <fstream>
 #include <iostream>
-#include <qdebug.h>
 #include <stdexcept>
 
 #include "LspClientImpl.hpp"
@@ -71,7 +68,7 @@ void LspClientImpl::setDocumentRoot(const std::string &newRoot) {
 void LspClientImpl::openDocument(const std::string &fileName, const std::string &fileContents)
 {
     // When opening a file:
-    static lsp::notifications::TextDocument_DidOpen::Params params{
+     lsp::notifications::TextDocument_DidOpen::Params params{
         .textDocument = {
             .uri = "file://" + fileName, 
             .languageId = "cpp", // or "c", "python", etc.
@@ -91,15 +88,13 @@ void LspClientImpl::hover(const std::string &fileName, int line, int column, std
     params.position.character = column;
     // params.workDoneToken
     
-    // params
     m_messageHandler->sendRequest<lsp::requests::TextDocument_Hover>(
-        std::move(params),
-        [callback](lsp::requests::TextDocument_Hover::Result &&result) {
+        std::move(params), [callback = std::move(callback)](auto result) {
             callback(std::move(result));
         },
         [](const lsp::Error &error) {
             std::cerr << "Failed to get response from LSP server: " << error.what() << std::endl;
-        }   
+        }
     );
 }
 
@@ -115,7 +110,7 @@ void LspClientImpl::startClangd() {
     clangdProcess->start();
 
     if (!clangdProcess->waitForStarted()) {
-        qWarning() << "Failed to start clangd!";
+        std::cerr << "Failed to start clangd!";
         return;
     }
 
@@ -127,7 +122,6 @@ void LspClientImpl::startClangd() {
 }
 
 void LspClientImpl::stopClangd() {
-
     m_running = false;
     // Send shutdown/exit message if needed here
     if (m_workerThread.joinable()) {
@@ -143,7 +137,7 @@ void LspClientImpl::initializeLspServer() {
     initializeParams.capabilities = {};
 
     auto id = m_messageHandler->sendRequest<lsp::requests::Initialize>(
-        lsp::requests::Initialize::Params{/* parameters */},
+        std::move(initializeParams),
         [](lsp::requests::Initialize::Result &&result) {
             std::cout << " - Server initialized successfully\n";
             if (result.capabilities.textDocumentSync.has_value()) {
@@ -182,7 +176,6 @@ void LspClientImpl::shutdownLspServer() {
 }
 
 void LspClientImpl::runLoop() {
-    QThread::sleep(2);
     while (m_running) {
         m_messageHandler->processIncomingMessages();
     }
