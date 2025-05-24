@@ -1,7 +1,9 @@
-# LSP cliet demo for Qt 
+# LSP client demo for Qt 
 
 This repo shows how to use [LSP framework](https://github.com/leon-bckl/lsp-framework)
-to connect your application to an LSP server (like clangd).
+to connect your application to an LSP server (like `clangd`). 
+While the example here is for C/C++, the same exact mechanism can
+be used to connect a Python LSP and get the same
 
 To learn about LSP visit - 
 https://microsoft.github.io/language-server-protocol/ and  https://en.wikipedia.org/wiki/Language_Server_Protocol.
@@ -36,10 +38,13 @@ need to install it locally. Using `CPM` will work as well.
 
 ## Status
 
-1. Not working yet. I get a single connection.
-2. Working only on Linux, Windows will come soon.
+1. Not working yet.
+  1. Iniailize server is working
+  1. Hover is WIP, non reliable yet.
+  1. Server gets reset (?) sometimes.
+2. Tested only on Linux, Windows will come soon.
 3. Forking clang is using QProcess. I want to remove this,
-   as I assume not all users of LSP will be using Qt.
+   as I assume not all users of LSP will be using Qt. 
 4. macOS is not tested. 
 
 License MIT
