@@ -1,63 +1,13 @@
-#include <QProcess>
-
 #include <cstring>
 #include <iostream>
-#include <stdexcept>
 
 #include "LspClientImpl.hpp"
 
 
-// internal class
-class QProcessStream : public lsp::io::Stream {
-public:
-    bool debugIO  = false;
-    
-    explicit QProcessStream(QProcess* process)
-        : m_process(process)
-    {
-        Q_ASSERT(process);
-    }
-
-    void read(char* buffer, std::size_t size) override {
-        std::size_t totalRead = 0;
-        while (totalRead < size) {
-            if (m_process->bytesAvailable() == 0 && !m_process->waitForReadyRead(-1)) {
-                throw std::runtime_error("Timeout or error reading from QProcess");
-            }
-
-            qint64 bytesRead = m_process->read(buffer + totalRead, size - totalRead);
-            if (bytesRead <= 0) {
-                throw std::runtime_error("Failed to read from QProcess");
-            }
-            if (debugIO) {
-                std::cerr << "Read bytes " << size << ": " << std::string(buffer, size) << std::endl;
-            }
-            totalRead += bytesRead;
-        }
-    }
-
-    void write(const char* buffer, std::size_t size) override {
-        qint64 bytesWritten = m_process->write(buffer, size);
-        if (bytesWritten < 0) {
-            throw std::runtime_error("Failed to write to QProcess");
-        }
-        if (debugIO) {
-            std::cerr << "Wrote bytes " << size << ": " << std::string(buffer, size) << std::endl;
-        }
-        if (!m_process->waitForBytesWritten(1)) {
-            throw std::runtime_error("Timeout writing to QProcess");
-        }
-    }
-
-private:
-    QProcess* m_process;
-};
-
 LspClientImpl::LspClientImpl() {}
 
 void LspClientImpl::debugIO(bool enable) {
-    auto io = dynamic_cast<QProcessStream*>(this->m_clandIO.get());
-    io->debugIO = enable;
+	(void)enable;
 }
 
 void LspClientImpl::setDocumentRoot(const std::string &newRoot) {
@@ -70,9 +20,9 @@ void LspClientImpl::openDocument(const std::string &fileName, const std::string 
     // When opening a file:
      lsp::notifications::TextDocument_DidOpen::Params params{
         .textDocument = {
-            .uri = "file://" + fileName, 
+            .uri = "file://" + fileName,
             .languageId = "cpp", // or "c", "python", etc.
-            .version = 1, 
+            .version = 1,
             .text = fileContents // The full text of the opened file
         }
     };
@@ -87,7 +37,7 @@ void LspClientImpl::hover(const std::string &fileName, int line, int column, std
     params.position.line = line;
     params.position.character = column;
     // params.workDoneToken
-    
+
     m_messageHandler->sendRequest<lsp::requests::TextDocument_Hover>(
         std::move(params), [callback = std::move(callback)](auto result) {
             callback(std::move(result));
@@ -104,18 +54,8 @@ LspClientImpl::~LspClientImpl() {
 }
 
 void LspClientImpl::startClangd() {
-    clangdProcess = new QProcess();
-    clangdProcess->setProgram("/usr/bin/clangd");
-    clangdProcess->setProcessChannelMode(QProcess::SeparateChannels);
-    clangdProcess->start();
-
-    if (!clangdProcess->waitForStarted()) {
-        std::cerr << "Failed to start clangd!";
-        return;
-    }
-
-    m_clandIO  = std::make_unique<QProcessStream>(clangdProcess);
-    m_connection = std::make_unique<lsp::Connection>(*m_clandIO);
+    m_clandIO  = std::make_unique<lsp::Process>("/usr/bin/clangd");
+    m_connection = std::make_unique<lsp::Connection>(m_clandIO->stdIO());
     m_messageHandler = std::make_unique<lsp::MessageHandler>(*m_connection);
     m_running = true;
     m_workerThread = std::thread(&LspClientImpl::runLoop, this);
@@ -127,8 +67,6 @@ void LspClientImpl::stopClangd() {
     if (m_workerThread.joinable()) {
         m_workerThread.join();
     }
-    delete clangdProcess;
-    clangdProcess = nullptr;
 }
 
 void LspClientImpl::initializeLspServer() {
