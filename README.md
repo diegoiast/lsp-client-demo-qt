@@ -43,9 +43,7 @@ need to install it locally. Using `CPM` will work as well.
   1. Hover is WIP, non reliable yet.
   1. Server gets reset (?) sometimes.
 2. Tested only on Linux, Windows will come soon.
-3. Forking clang is using QProcess. I want to remove this,
-   as I assume not all users of LSP will be using Qt. 
-4. macOS is not tested. 
+3. macOS is not tested. Should work :) 
 
 License MIT
 
