@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QProcess>
 #include <atomic>
 #include <functional>
 #include <memory>
