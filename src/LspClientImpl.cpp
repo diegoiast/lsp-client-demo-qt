@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "LspClientImpl.hpp"
+#include "lsp/fileuri.h"
 
 
 LspClientImpl::LspClientImpl() {}
@@ -20,7 +21,7 @@ void LspClientImpl::openDocument(const std::string &fileName, const std::string 
     // When opening a file:
      lsp::notifications::TextDocument_DidOpen::Params params{
         .textDocument = {
-            .uri = "file://" + fileName,
+            .uri = lsp::FileUri::fromPath(fileName),
             .languageId = "cpp", // or "c", "python", etc.
             .version = 1,
             .text = fileContents // The full text of the opened file
@@ -33,7 +34,7 @@ void LspClientImpl::openDocument(const std::string &fileName, const std::string 
 void LspClientImpl::hover(const std::string &fileName, int line, int column, std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback)
 {
     lsp::HoverParams params;
-    params.textDocument.uri = std::string("file://") + fileName;
+    params.textDocument.uri = lsp::FileUri::fromPath(fileName);
     params.position.line = line;
     params.position.character = column;
     // params.workDoneToken
@@ -71,7 +72,7 @@ void LspClientImpl::stopClangd() {
 
 void LspClientImpl::initializeLspServer() {
     auto initializeParams = lsp::requests::Initialize::Params{};
-    initializeParams.rootUri = "file://" + m_documentRoot;
+    initializeParams.rootUri = lsp::FileUri::fromPath(m_documentRoot);
     initializeParams.capabilities = {};
 
     auto id = m_messageHandler->sendRequest<lsp::requests::Initialize>(
