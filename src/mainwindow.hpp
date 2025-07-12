@@ -12,8 +12,10 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 
-#include "AppOutputRedirector.hpp"
 #include "LspClientImpl.hpp"
+
+class AppOutputRedirector;
+class FilesList;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -21,7 +23,6 @@ public:
     MainWindow(QWidget* parent = nullptr);
 
 private:
-    QListWidget* sidebar;
     QTabWidget* tabWidget;
     QToolBar* toolbar;
     QAction* openDirAction;
@@ -32,32 +33,26 @@ private:
     QAction* clearDebugAction;
     QShortcut* closeTabShortcut;
     QDockWidget* dock;
-    QLineEdit* excludeEdit;
-    QLineEdit* showEdit;
     QString projectDir;
-    QStringList allFiles;
     QDockWidget* outputDock;
     QTextEdit* outputEdit;
-    
-    
+
+    FilesList* filesList = nullptr;
     AppOutputRedirector* outputRedirector = nullptr;
     LspClientImpl lspClient;
-    
+
     void openDirectory();
     void loadFiles(const QString& dirPath);
     void addFilesRecursive(const QString& baseDir, const QString& currentDir, QStringList& files);
     void openFileInTab(const QString& relPath);
     void closeDirectory();
     void closeCurrentTab();
-    void updateFileList();
     void appendStdout(const QString& text);
     void appendStderr(const QString& text);
 
 private slots:
-    void onSidebarItemClicked(QListWidgetItem* item);
     void onOpenDirClicked();
     void onCloseDirClicked();
     void onQuitClicked();
     void onCloseTabClicked();
-    void onFilterChanged();
 };

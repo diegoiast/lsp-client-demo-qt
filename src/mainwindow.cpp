@@ -15,7 +15,9 @@
 #include <QTimer>
 
 #include "mainwindow.hpp"
+#include "AppOutputRedirector.hpp"
 #include "CodeEditor.hpp"
+#include "FilesList.hpp"
 
 template<typename Func>
 void runOnUiThread(Func&& func) {
@@ -28,32 +30,17 @@ MainWindow::MainWindow(QWidget* parent)
     tabWidget = new QTabWidget;
     setCentralWidget(tabWidget);
 
-    sidebar = new QListWidget;
-    excludeEdit = new QLineEdit;
-    showEdit = new QLineEdit;
-    excludeEdit->setText("build");
-    showEdit->setPlaceholderText("Show (substring, empty=all)");
-    excludeEdit->setPlaceholderText("Exclude (semicolon-separated substrings)");
-
     auto* dockWidget = new QWidget;
     auto* dockLayout = new QVBoxLayout(dockWidget);
+    filesList = new FilesList(this);
     dockLayout->setContentsMargins(0,0,0,0);
-    dockLayout->addWidget(sidebar);
-
-    auto* excludeLabel = new QLabel("Exclude (use ; to separate):");
-    auto* showLabel = new QLabel("Show:");
-    dockLayout->addWidget(excludeLabel);
-    dockLayout->addWidget(excludeEdit);
-    dockLayout->addWidget(showLabel);
-    dockLayout->addWidget(showEdit);
+    dockLayout->addWidget(filesList);
+    connect(filesList, &FilesList::fileSelected, this, &MainWindow::openFileInTab);
 
     dock = new QDockWidget(tr("Project Files"), this);
     dock->setWidget(dockWidget);
     addDockWidget(Qt::LeftDockWidgetArea, dock);
 
-    connect(sidebar, &QListWidget::itemClicked, this, &MainWindow::onSidebarItemClicked);
-    connect(excludeEdit, &QLineEdit::textChanged, this, &MainWindow::onFilterChanged);
-    connect(showEdit, &QLineEdit::textChanged, this, &MainWindow::onFilterChanged);
 
     toolbar = addToolBar("Main Toolbar");
     openDirAction = toolbar->addAction(tr("Open Dir"));
@@ -63,15 +50,15 @@ MainWindow::MainWindow(QWidget* parent)
     showDebugAction->setCheckable(true);
     clearDebugAction = toolbar->addAction(tr("Clear Debug"));
     quitAction = toolbar->addAction(tr("Quit"));
-    
+
     outputEdit = new QTextEdit(this);
     outputEdit->setReadOnly(true);
-    outputEdit->setAcceptRichText(false); 
-    
+    outputEdit->setAcceptRichText(false);
+
     outputDock = new QDockWidget(tr("Output"), this);
     outputDock->setWidget(outputEdit);
     addDockWidget(Qt::RightDockWidgetArea, outputDock);
-    
+
     outputRedirector = new AppOutputRedirector(this);
     connect(outputRedirector, &AppOutputRedirector::newStdout, this, &MainWindow::appendStdout);
     connect(outputRedirector, &AppOutputRedirector::newStderr, this, &MainWindow::appendStderr);
@@ -101,26 +88,20 @@ void MainWindow::openDirectory() {
         projectDir = dir + "/";
         loadFiles(dir);
         dock->setWindowTitle(tr("Project: %1").arg(QFileInfo(dir).fileName()));
-        
+
         lspClient.setDocumentRoot(projectDir.toStdString());
     }
 }
 
 void MainWindow::closeDirectory() {
-    sidebar->clear();
     tabWidget->clear();
     projectDir.clear();
-    allFiles.clear();
     dock->setWindowTitle(tr("Project Files"));
 }
 
 void MainWindow::loadFiles(const QString& dirPath) {
-    sidebar->clear();
     tabWidget->clear();
-    allFiles.clear();
-    addFilesRecursive(dirPath, dirPath, allFiles);
-    allFiles.sort(Qt::CaseInsensitive);
-    updateFileList();
+    filesList->setDir(dirPath);
 }
 
 void MainWindow::addFilesRecursive(const QString& baseDir, const QString& currentDir, QStringList& files) {
@@ -140,10 +121,6 @@ void MainWindow::addFilesRecursive(const QString& baseDir, const QString& curren
     }
 }
 
-void MainWindow::onSidebarItemClicked(QListWidgetItem* item) {
-    openFileInTab(item->text());
-}
-
 void MainWindow::openFileInTab(const QString& relPath) {
     if (projectDir.isEmpty())
         return;
@@ -154,7 +131,7 @@ void MainWindow::openFileInTab(const QString& relPath) {
     auto text = in.readAll();
     auto editor = new CodeEditor;
     auto path = (projectDir + relPath).toStdString();
-    
+
     editor->setPlainText(text);
     editor->setReadOnly(false);
     connect(editor, &CodeEditor::hoveredWordTooltip, editor, [path, this, editor](const QString& word, int line, int column, const QPoint& globalPos){
@@ -165,11 +142,11 @@ void MainWindow::openFileInTab(const QString& relPath) {
                     QToolTip::hideText();
                     return;
                 }
-                auto tooltip = QString("OK - Line=%1, column=%2, word=%3").arg(line).arg(column).arg(word);        
-                auto &contents = result->contents;        
+                auto tooltip = QString("OK - Line=%1, column=%2, word=%3").arg(line).arg(column).arg(word);
+                auto &contents = result->contents;
                 std::visit([&](const auto& value) {
                     using T = std::decay_t<decltype(value)>;
-            
+
                     if constexpr (std::is_same_v<T, lsp::MarkupContent>) {
                         tooltip = QString::fromStdString(value.value);
                     } else if constexpr (std::is_same_v<T, std::string>) {
@@ -192,16 +169,16 @@ void MainWindow::openFileInTab(const QString& relPath) {
                         }
                         tooltip = parts.join("\n");
                     }
-                }, contents);           
-                
+                }, contents);
+
                 QToolTip::showText(globalPos, tooltip, editor, {}, 5000);
             });
         });
     });
-    
+
     auto tabIdx = tabWidget->addTab(editor, relPath);
     tabWidget->setCurrentIndex(tabIdx);
-    
+
     auto contents = text.toStdString();
     lspClient.openDocument(path, contents);
 }
@@ -228,34 +205,6 @@ void MainWindow::closeCurrentTab() {
         tabWidget->removeTab(idx);
 }
 
-void MainWindow::onFilterChanged() {
-    updateFileList();
-}
-
-void MainWindow::updateFileList() {
-    sidebar->clear();
-    auto excludeStr = excludeEdit->text().trimmed();
-    auto showStr = showEdit->text().trimmed();
-
-    QStringList excludeList;
-    if (!excludeStr.isEmpty())
-        excludeList = excludeStr.split(';', Qt::SkipEmptyParts);
-
-    for (const auto& rel : allFiles) {
-        auto excluded = false;
-        for (const auto& ex : excludeList) {
-            if (!ex.trimmed().isEmpty() && rel.contains(ex.trimmed(), Qt::CaseInsensitive)) {
-                excluded = true;
-                break;
-            }
-        }
-        if (excluded)
-            continue;
-        if (!showStr.isEmpty() && !rel.contains(showStr, Qt::CaseInsensitive))
-            continue;
-        sidebar->addItem(rel);
-    }
-}
 
 void MainWindow::appendStdout(const QString& text) {
     outputEdit->moveCursor(QTextCursor::End);
