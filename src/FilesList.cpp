@@ -200,6 +200,11 @@ void FilesList::updateList() {
         }
     }
 
-    list->addItems(chunk);
+    chunk.sort();
+    for (const auto &rel : chunk) {
+        auto *item = new QListWidgetItem(QDir::toNativeSeparators(rel));
+        item->setToolTip(QDir::toNativeSeparators(directory + rel));
+        list->addItem(item);
+    }
     emit filtersChanged();
 }
