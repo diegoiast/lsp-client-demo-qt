@@ -12,7 +12,9 @@
 #include <QVBoxLayout>
 
 // Normalize path to use `/`
-static QString normalizePath(const QString &path) { return QDir::fromNativeSeparators(path); }
+static inline QString normalizePath(const QString &path) {
+    return QDir::fromNativeSeparators(path);
+}
 
 // Convert glob to regex list
 static QList<QRegularExpression> toRegexList(const QStringList &patterns) {
@@ -36,8 +38,6 @@ static QList<QRegularExpression> toRegexList(const QStringList &patterns) {
     }
     return list;
 }
-
-// ========================= FileScannerWorker =========================
 
 FileScannerWorker::FileScannerWorker(QObject *parent) : QObject(parent) {}
 
@@ -143,14 +143,19 @@ void FilesList::clear() {
 }
 
 QStringList FilesList::currentFilteredFiles() const {
-    QStringList res;
-    for (int i = 0; i < list->count(); ++i) {
+    auto res = QStringList();
+    for (auto i = 0; i < list->count(); ++i) {
         res << list->item(i)->text();
     }
     return res;
 }
 
-void FilesList::scheduleUpdateList() { updateTimer->start(); }
+void FilesList::scheduleUpdateList() {
+    if (updateTimer->isActive()) {
+        updateTimer->stop();
+    }
+    updateTimer->start();
+}
 
 void FilesList::updateList(const QStringList &files, bool clearList) {
     if (clearList) {
@@ -160,17 +165,16 @@ void FilesList::updateList(const QStringList &files, bool clearList) {
     auto excludes = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
     auto shows = toRegexList(showEdit->text().split(';', Qt::SkipEmptyParts));
     auto showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
+    auto filtered = QStringList();
+    auto count = 0;
 
-    QStringList filtered;
-    int count = 0;
-
-    for (const auto &rel : files) {
+    for (auto const &rel : files) {
         auto normPath = normalizePath(rel);
         auto segments = normPath.split('/', Qt::SkipEmptyParts);
+        auto excluded = false;
 
-        bool excluded = false;
-        for (const auto &rx : excludes) {
-            for (const auto &segment : segments) {
+        for (auto const &rx : excludes) {
+            for (auto const &segment : segments) {
                 if (rx.match(segment).hasMatch()) {
                     excluded = true;
                     break;
@@ -185,9 +189,9 @@ void FilesList::updateList(const QStringList &files, bool clearList) {
         }
 
         if (!shows.isEmpty() || !showTokens.isEmpty()) {
-            bool matched = false;
-            for (const auto &rx : shows) {
-                for (const auto &segment : segments) {
+            auto matched = false;
+            for (auto const &rx : shows) {
+                for (auto const &segment : segments) {
                     if (rx.match(segment).hasMatch()) {
                         matched = true;
                         break;
@@ -199,8 +203,8 @@ void FilesList::updateList(const QStringList &files, bool clearList) {
             }
 
             if (!matched && !showTokens.isEmpty()) {
-                for (const auto &token : showTokens) {
-                    for (const auto &segment : segments) {
+                for (auto const &token : showTokens) {
+                    for (auto const &segment : segments) {
                         if (segment.toLower().contains(token)) {
                             matched = true;
                             break;
@@ -218,19 +222,17 @@ void FilesList::updateList(const QStringList &files, bool clearList) {
         }
 
         filtered << rel;
-
         if (++count % 200 == 0) {
             QCoreApplication::processEvents();
         }
     }
 
     filtered.sort(Qt::CaseInsensitive);
-    for (const auto &rel : filtered) {
+    for (auto const &rel : filtered) {
         auto *item = new QListWidgetItem(QDir::toNativeSeparators(rel));
         item->setToolTip(QDir::toNativeSeparators(directory + rel));
         list->addItem(item);
     }
-
     if (clearList) {
         emit filtersChanged();
     }
