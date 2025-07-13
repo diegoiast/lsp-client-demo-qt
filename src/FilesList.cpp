@@ -138,7 +138,6 @@ void FilesList::setFiles(const QStringList &files) {
 
 void FilesList::clear() {
     fullList.clear();
-    filteredList.clear();
     list->clear();
     directory.clear();
 }
@@ -156,7 +155,6 @@ void FilesList::scheduleUpdateList() { updateTimer->start(); }
 void FilesList::updateList(const QStringList &files, bool clearList) {
     if (clearList) {
         list->clear();
-        filteredList.clear();
     }
 
     auto excludes = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
@@ -232,8 +230,6 @@ void FilesList::updateList(const QStringList &files, bool clearList) {
         item->setToolTip(QDir::toNativeSeparators(directory + rel));
         list->addItem(item);
     }
-
-    filteredList.append(filtered);
 
     if (clearList) {
         emit filtersChanged();

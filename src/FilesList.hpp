@@ -57,7 +57,6 @@ class FilesList : public QWidget {
 
     QString directory;
     QStringList fullList;
-    QStringList filteredList;
 
     QThread *filterThread = nullptr;
     FileFilterWorker *filterWorker = nullptr;
