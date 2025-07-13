@@ -6,6 +6,24 @@
 #include <QVBoxLayout>
 #include <QStringList>
 
+class FileScannerWorker : public QObject {
+    Q_OBJECT
+
+public:
+    explicit FileScannerWorker(QObject* parent = nullptr);
+    void setRootDir(const QString& dir);
+    void start();
+
+signals:
+    void filesFound(const QStringList& files);  // emits after each dir
+    void finished(qint64 elapsedMs);  // include time
+private:
+    void scanDir(const QString& path, QStringList& buffer);
+
+    QString rootDir;
+    QRegularExpression fileFilter;
+};
+
 class FilesList : public QWidget {
     Q_OBJECT
 
@@ -31,3 +49,4 @@ private:
     QLineEdit* excludeEdit;
     QLineEdit* showEdit;
 };
+
