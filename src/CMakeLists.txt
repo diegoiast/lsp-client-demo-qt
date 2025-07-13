@@ -1,4 +1,4 @@
-qt_add_executable(lsp_client_demo_qt
+qt_add_executable(lsp_client_demo_qt WIN32
     main.cpp
     mainwindow.cpp
     mainwindow.hpp
