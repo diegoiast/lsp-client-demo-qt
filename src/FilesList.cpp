@@ -103,7 +103,7 @@ FilesList::FilesList(QWidget *parent) : QWidget(parent) {
     updateTimer = new QTimer(this);
     updateTimer->setSingleShot(true);
     updateTimer->setInterval(300);
-    connect(updateTimer, &QTimer::timeout, this, &FilesList::updateList);
+    connect(updateTimer, &QTimer::timeout, this, [this]() { updateList(fullList, true); });
 }
 
 void FilesList::setDir(const QString &dir) {
@@ -116,12 +116,12 @@ void FilesList::setDir(const QString &dir) {
     worker->setRootDir(dir);
     connect(worker, &FileScannerWorker::filesChunkFound, this, [=](const QStringList &chunk) {
         fullList.append(chunk);
-        updateListChunked(chunk);
+        updateList(chunk, false);
     });
     connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
         connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
             qDebug() << "Scan finished in" << ms << "ms";
-            updateList();
+            updateList(fullList, true);
             worker->deleteLater();
             thread->quit();
         });
@@ -153,17 +153,25 @@ QStringList FilesList::currentFilteredFiles() const {
 
 void FilesList::scheduleUpdateList() { updateTimer->start(); }
 
-void FilesList::updateListChunked(const QStringList &newFiles) {
+void FilesList::updateList(const QStringList &files, bool clearList) {
+    if (clearList) {
+        list->clear();
+        filteredList.clear();
+    }
+
     auto excludes = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
     auto shows = toRegexList(showEdit->text().split(';', Qt::SkipEmptyParts));
-    auto filteredChunk = QStringList();
+    auto showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
 
-    for (const auto &rel : newFiles) {
-        auto normPath = normalizePath(rel).toLower();
+    QStringList filtered;
+    int count = 0;
+
+    for (const auto &rel : files) {
+        auto normPath = normalizePath(rel);
         auto segments = normPath.split('/', Qt::SkipEmptyParts);
-        auto excluded = false;
 
-        for (auto const &rx : excludes) {
+        bool excluded = false;
+        for (const auto &rx : excludes) {
             for (const auto &segment : segments) {
                 if (rx.match(segment).hasMatch()) {
                     excluded = true;
@@ -178,71 +186,11 @@ void FilesList::updateListChunked(const QStringList &newFiles) {
             continue;
         }
 
-        if (!shows.isEmpty()) {
+        if (!shows.isEmpty() || !showTokens.isEmpty()) {
             bool matched = false;
-            for (auto const &rx : shows) {
-                for (auto const &segment : segments) {
-                    if (rx.match(segment).hasMatch() ||
-                        segment.contains(rx.pattern(), Qt::CaseInsensitive)) {
-                        matched = true;
-                        break;
-                    }
-                }
-                if (matched) {
-                    break;
-                }
-            }
-            if (!matched) {
-                continue;
-            }
-        }
-
-        filteredChunk << rel;
-    }
-
-    filteredChunk.sort(Qt::CaseInsensitive);
-    for (auto const &rel : filteredChunk) {
-        auto *item = new QListWidgetItem(QDir::toNativeSeparators(rel));
-        item->setToolTip(QDir::toNativeSeparators(directory + rel));
-        list->addItem(item);
-    }
-
-    filteredList.append(filteredChunk);
-}
-
-void FilesList::updateList() {
-    auto const excludeGlobs = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
-    auto const showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
-    auto chunk = QStringList();
-    auto count = 0;
-
-    list->clear();
-    for (const auto &rel : fullList) {
-        auto const normPath = normalizePath(rel);
-        auto const segments = normPath.split('/', Qt::SkipEmptyParts);
-        auto const fileName = QFileInfo(normPath).fileName();
-
-        auto excluded = false;
-        for (const auto &rx : excludeGlobs) {
-            for (const auto &segment : segments) {
-                if (rx.match(segment).hasMatch()) {
-                    excluded = true;
-                    break;
-                }
-            }
-            if (excluded) {
-                break;
-            }
-        }
-        if (excluded) {
-            continue;
-        }
-
-        if (!showTokens.isEmpty()) {
-            bool matched = false;
-            for (const auto &token : showTokens) {
+            for (const auto &rx : shows) {
                 for (const auto &segment : segments) {
-                    if (segment.toLower().contains(token)) {
+                    if (rx.match(segment).hasMatch()) {
                         matched = true;
                         break;
                     }
@@ -251,23 +199,43 @@ void FilesList::updateList() {
                     break;
                 }
             }
+
+            if (!matched && !showTokens.isEmpty()) {
+                for (const auto &token : showTokens) {
+                    for (const auto &segment : segments) {
+                        if (segment.toLower().contains(token)) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (matched) {
+                        break;
+                    }
+                }
+            }
+
             if (!matched) {
                 continue;
             }
         }
 
-        chunk << rel;
+        filtered << rel;
 
         if (++count % 200 == 0) {
             QCoreApplication::processEvents();
         }
     }
 
-    chunk.sort(Qt::CaseInsensitive);
-    for (auto const &rel : chunk) {
+    filtered.sort(Qt::CaseInsensitive);
+    for (const auto &rel : filtered) {
         auto *item = new QListWidgetItem(QDir::toNativeSeparators(rel));
         item->setToolTip(QDir::toNativeSeparators(directory + rel));
         list->addItem(item);
     }
-    emit filtersChanged();
+
+    filteredList.append(filtered);
+
+    if (clearList) {
+        emit filtersChanged();
+    }
 }

@@ -47,9 +47,8 @@ class FilesList : public QWidget {
                           const QStringList &showPatterns);
 
   private slots:
-    void updateList();
     void scheduleUpdateList();
-    void updateListChunked(const QStringList &newFiles);
+    void updateList(const QStringList &files, bool clearList);
 
   private:
     QListWidget *list = nullptr;
