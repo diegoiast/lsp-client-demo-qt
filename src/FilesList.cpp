@@ -1,7 +1,7 @@
 #include "FilesList.hpp"
 
-#include <QDir>
 #include <QDebug>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QLabel>
@@ -11,14 +11,11 @@
 // Set to 0 to use regex instead of glob
 #define USE_GLOB_MATCHING 0
 
+FileScannerWorker::FileScannerWorker(QObject *parent)
+    : QObject(parent), fileFilter(R"((\.h|\.hpp|\.c|\.cpp|\.txt|\.md)$)",
+                                  QRegularExpression::CaseInsensitiveOption) {}
 
-FileScannerWorker::FileScannerWorker(QObject* parent)
-    : QObject(parent),
-      fileFilter(R"((\.h|\.hpp|\.c|\.cpp|\.txt|\.md)$)", QRegularExpression::CaseInsensitiveOption) {}
-
-void FileScannerWorker::setRootDir(const QString& dir) {
-    rootDir = dir;
-}
+void FileScannerWorker::setRootDir(const QString &dir) { rootDir = dir; }
 
 void FileScannerWorker::start() {
     QElapsedTimer timer;
@@ -35,16 +32,18 @@ void FileScannerWorker::start() {
     emit finished(timer.elapsed());
 }
 
-void FileScannerWorker::scanDir(const QString& path, QStringList& buffer) {
+void FileScannerWorker::scanDir(const QString &path, QStringList &buffer) {
     QDir dir(path);
-    QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable);
+    QFileInfoList entries =
+        dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable);
 
-    for (const QFileInfo& entry : entries) {
+    for (const QFileInfo &entry : entries) {
         if (entry.isDir()) {
             scanDir(entry.absoluteFilePath(), buffer);
         } else {
             QString name = entry.fileName();
-            if (fileFilter.match(name).hasMatch() || name.compare("makefile", Qt::CaseInsensitive) == 0) {
+            if (fileFilter.match(name).hasMatch() ||
+                name.compare("makefile", Qt::CaseInsensitive) == 0) {
                 QString relPath = QDir(rootDir).relativeFilePath(entry.absoluteFilePath());
                 buffer << relPath;
 
@@ -58,9 +57,7 @@ void FileScannerWorker::scanDir(const QString& path, QStringList& buffer) {
     }
 }
 
-FilesList::FilesList(QWidget* parent)
-    : QWidget(parent)
-{
+FilesList::FilesList(QWidget *parent) : QWidget(parent) {
     auto layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -78,41 +75,40 @@ FilesList::FilesList(QWidget* parent)
     layout->addWidget(excludeEdit);
     layout->addWidget(showEdit);
 
-    connect(list, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
-        emit fileSelected(item->text());
-    });
+    connect(list, &QListWidget::itemClicked, this,
+            [this](QListWidgetItem *item) { emit fileSelected(item->text()); });
     connect(excludeEdit, &QLineEdit::textChanged, this, &FilesList::updateList);
     connect(showEdit, &QLineEdit::textChanged, this, &FilesList::updateList);
 }
 
-void FilesList::setFiles(const QStringList& files) {
+void FilesList::setFiles(const QStringList &files) {
     allFiles = files;
     updateList();
 }
 
-void FilesList::setDir(const QString& dir) {
+void FilesList::setDir(const QString &dir) {
     clear();
     directory = dir;
 
-    QThread* workerThread = new QThread;
-    auto* worker = new FileScannerWorker;
+    QThread *workerThread = new QThread;
+    auto *worker = new FileScannerWorker;
 
     worker->setRootDir(dir);
     worker->moveToThread(workerThread);
 
     connect(workerThread, &QThread::started, worker, &FileScannerWorker::start);
-    connect(worker, &FileScannerWorker::filesFound, this, [this](const QStringList& newFiles) {
+    connect(worker, &FileScannerWorker::filesFound, this, [this](const QStringList &newFiles) {
         allFiles += newFiles;
         allFiles.removeDuplicates();
         allFiles.sort(Qt::CaseInsensitive);
         updateList();
     });
     connect(worker, &FileScannerWorker::finished, this, [=](qint64 elapsedMs) {
-       qDebug("Directory traversal finished in %lld ms", elapsedMs);
-       workerThread->quit();
-       workerThread->wait();
-       worker->deleteLater();
-       workerThread->deleteLater();
+        qDebug("Directory traversal finished in %lld ms", elapsedMs);
+        workerThread->quit();
+        workerThread->wait();
+        worker->deleteLater();
+        workerThread->deleteLater();
     });
 
     workerThread->start();
@@ -132,10 +128,9 @@ QStringList FilesList::currentFilteredFiles() const {
     return result;
 }
 
-
 void FilesList::updateList() {
-    //QElapsedTimer timer;
-    //timer.start();
+    // QElapsedTimer timer;
+    // timer.start();
 
     list->clear();
 
@@ -147,13 +142,14 @@ void FilesList::updateList() {
 
 #if !USE_GLOB_MATCHING
     // Convert glob-like input into regex list
-    auto toRegexList = [](const QStringList& patterns) {
+    auto toRegexList = [](const QStringList &patterns) {
         QList<QRegularExpression> regexList;
-        for (const auto& pattern : patterns) {
+        for (const auto &pattern : patterns) {
             QString p = QRegularExpression::escape(pattern.trimmed());
             p.replace("\\*", ".*");
             p.replace("\\?", ".");
-            regexList.append(QRegularExpression("^" + p + "$", QRegularExpression::CaseInsensitiveOption));
+            regexList.append(
+                QRegularExpression("^" + p + "$", QRegularExpression::CaseInsensitiveOption));
         }
         return regexList;
     };
@@ -162,7 +158,7 @@ void FilesList::updateList() {
     const auto showRegexes = toRegexList(showPatterns);
 #endif
 
-    for (const QString& rel : allFiles) {
+    for (const QString &rel : allFiles) {
         const QString relLower = rel.toLower();
         const QStringList components = relLower.split('/', Qt::SkipEmptyParts);
         const QFileInfo fi(rel);
@@ -170,10 +166,11 @@ void FilesList::updateList() {
 
         // --- EXCLUDE FILTER ---
         bool excluded = false;
-        for (const QString& pattern : excludePatterns) {
+        for (const QString &pattern : excludePatterns) {
             const QString p = pattern.trimmed().toLower();
-            if (p.isEmpty())
+            if (p.isEmpty()) {
                 continue;
+            }
 
             // Component match
             if (components.contains(p)) {
@@ -199,7 +196,7 @@ void FilesList::updateList() {
                 break;
             }
 #else
-            for (const auto& rx : excludeRegexes) {
+            for (const auto &rx : excludeRegexes) {
                 if (rx.match(rel).hasMatch() || rx.match(fi.fileName()).hasMatch()) {
                     excluded = true;
                     break;
@@ -208,17 +205,19 @@ void FilesList::updateList() {
 #endif
         }
 
-        if (excluded)
+        if (excluded) {
             continue;
+        }
 
         // --- SHOW FILTER ---
         if (!showPatterns.isEmpty()) {
             bool matched = false;
 
-            for (const QString& pattern : showPatterns) {
+            for (const QString &pattern : showPatterns) {
                 const QString p = pattern.trimmed().toLower();
-                if (p.isEmpty())
+                if (p.isEmpty()) {
                     continue;
+                }
 
                 // Exact full match
                 if (relLower == p || fileNameLower == p) {
@@ -232,7 +231,7 @@ void FilesList::updateList() {
                     break;
                 }
 #else
-                for (const auto& rx : showRegexes) {
+                for (const auto &rx : showRegexes) {
                     if (rx.match(rel).hasMatch() || rx.match(fi.fileName()).hasMatch()) {
                         matched = true;
                         break;
@@ -241,8 +240,9 @@ void FilesList::updateList() {
 #endif
             }
 
-            if (!matched)
+            if (!matched) {
                 continue;
+            }
         }
 
         list->addItem(rel);
@@ -250,8 +250,8 @@ void FilesList::updateList() {
 
     emit filtersChanged();
 
-/*    qint64 elapsedMs = timer.elapsed();
-    qDebug("FilesList::updateList took %lld ms (using %s)", elapsedMs,
-           USE_GLOB_MATCHING ? "GLOB" : "REGEX");
-*/
+    /*    qint64 elapsedMs = timer.elapsed();
+        qDebug("FilesList::updateList took %lld ms (using %s)", elapsedMs,
+               USE_GLOB_MATCHING ? "GLOB" : "REGEX");
+    */
 }
