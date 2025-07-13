@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QElapsedTimer>
 
 FilesList::FilesList(QWidget* parent)
     : QWidget(parent)
@@ -59,8 +60,12 @@ void FilesList::setDir(const QString& dir) {
         }
     };
 
+    QElapsedTimer t;
+    t.start();
     addFilesRecursive(directory);
+    qDebug() << "Loading files took" << t.elapsed();
     allFiles.sort(Qt::CaseInsensitive);
+    qDebug() << "Sorting files took" << t.elapsed();
     updateList();
 }
 
@@ -78,29 +83,113 @@ QStringList FilesList::currentFilteredFiles() const {
     return result;
 }
 
+
 void FilesList::updateList() {
+    QElapsedTimer timer;
+    timer.start();
+
     list->clear();
-    auto excludeStr = excludeEdit->text().trimmed();
-    auto showStr = showEdit->text().trimmed();
 
-    QStringList excludeList;
-    if (!excludeStr.isEmpty())
-        excludeList = excludeStr.split(';', Qt::SkipEmptyParts);
+    const QString excludeStr = excludeEdit->text().trimmed();
+    const QString showStr = showEdit->text().trimmed();
 
-    for (const auto& rel : allFiles) {
-        auto excluded = false;
-        for (const auto& ex : excludeList) {
-            if (!ex.trimmed().isEmpty() && rel.contains(ex.trimmed(), Qt::CaseInsensitive)) {
+    const QStringList excludePatterns = excludeStr.split(';', Qt::SkipEmptyParts);
+    const QStringList showPatterns = showStr.split(';', Qt::SkipEmptyParts);
+
+    auto toRegexList = [](const QStringList& patterns) {
+        QList<QRegularExpression> regexList;
+        for (const auto& pattern : patterns) {
+            QString p = QRegularExpression::escape(pattern.trimmed());
+            p.replace("\\*", ".*");
+            p.replace("\\?", ".");
+            regexList.append(QRegularExpression("^" + p + "$", QRegularExpression::CaseInsensitiveOption));
+        }
+        return regexList;
+    };
+
+    const auto excludeRegexes = toRegexList(excludePatterns);
+    const auto showRegexes = toRegexList(showPatterns);
+
+    for (const QString& rel : allFiles) {
+        const QString relLower = rel.toLower();
+        const QStringList components = relLower.split('/', Qt::SkipEmptyParts);
+        const QFileInfo fi(rel);
+        const QString fileNameLower = fi.fileName().toLower();
+
+        // --- EXCLUDE FILTER ---
+        bool excluded = false;
+        for (const QString& ex : excludePatterns) {
+            const QString trimmed = ex.trimmed().toLower();
+            if (trimmed.isEmpty())
+                continue;
+
+            // Exact component match only (no substring)
+            if (components.contains(trimmed)) {
+                excluded = true;
+                break;
+            }
+
+            // Exact full relative path match only
+            if (relLower == trimmed) {
+                excluded = true;
+                break;
+            }
+
+            // Exact filename match only
+            if (fileNameLower == trimmed) {
                 excluded = true;
                 break;
             }
         }
+
+        // Glob pattern exclude match on full path or filename
+        if (!excluded) {
+            for (const auto& rx : excludeRegexes) {
+                if (rx.match(rel).hasMatch() || rx.match(fi.fileName()).hasMatch()) {
+                    excluded = true;
+                    break;
+                }
+            }
+        }
+
         if (excluded)
             continue;
-        if (!showStr.isEmpty() && !rel.contains(showStr, Qt::CaseInsensitive))
-            continue;
+
+        // --- SHOW FILTER ---
+        if (!showPatterns.isEmpty()) {
+            bool matched = false;
+
+            for (const QString& pattern : showPatterns) {
+                const QString trimmed = pattern.trimmed().toLower();
+                if (trimmed.isEmpty())
+                    continue;
+
+                // Substring or exact match in full path (this part is substring as original, can adjust if needed)
+                if (relLower.contains(trimmed) || relLower == trimmed) {
+                    matched = true;
+                    break;
+                }
+            }
+
+            // Glob match on full path or filename
+            if (!matched) {
+                for (const auto& rx : showRegexes) {
+                    if (rx.match(rel).hasMatch() || rx.match(fi.fileName()).hasMatch()) {
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!matched)
+                continue;
+        }
+
         list->addItem(rel);
     }
 
     emit filtersChanged();
+
+    qint64 elapsedMs = timer.elapsed();
+    qDebug("FilesList::updateList took %lld ms", elapsedMs);
 }
