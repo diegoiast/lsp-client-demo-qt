@@ -1,4 +1,4 @@
-#include "FilesList.hpp"
+﻿#include "FilesList.hpp"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -31,7 +31,7 @@ static QList<QRegularExpression> toRegexList(const QStringList &patterns) {
             }
         }
         if (!rx.isEmpty()) {
-            list << QRegularExpression(rx, QRegularExpression::CaseInsensitiveOption);
+            list << QRegularExpression("^" + rx + "$", QRegularExpression::CaseInsensitiveOption);
         }
     }
     return list;
@@ -116,8 +116,8 @@ void FilesList::setDir(const QString &dir) {
         qDebug() << "Scan finished in" << ms << "ms";
         worker->deleteLater();
         thread->quit();
-        thread->deleteLater();
     });
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
 
     thread->start();
 }
@@ -146,42 +146,56 @@ void FilesList::scheduleUpdateList() { updateTimer->start(); }
 void FilesList::updateList() {
     list->clear();
 
-    auto excludes = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
-    auto shows = toRegexList(showEdit->text().split(';', Qt::SkipEmptyParts));
+    const auto excludeGlobs = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
+    const auto showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
 
     QStringList chunk;
     int count = 0;
+
     for (const auto &rel : allFiles) {
-        auto path = normalizePath(rel).toLower();
-        auto file = QFileInfo(rel).fileName().toLower();
+        const auto normPath = normalizePath(rel);
+        const auto segments = normPath.split('/', Qt::SkipEmptyParts);
+        const auto fileName = QFileInfo(normPath).fileName();
 
-        bool skip = false;
-        for (const auto &rx : excludes) {
-            if (rx.match(path).hasMatch() || rx.match(file).hasMatch()) {
-                skip = true;
-                break;
-            }
-        }
-        if (skip) {
-            continue;
-        }
-
-        if (!shows.isEmpty()) {
-            bool ok = false;
-            for (const auto &rx : shows) {
-                if (rx.match(path).hasMatch() || rx.match(file).hasMatch()) {
-                    ok = true;
+        // Exclude: exact glob-style match per segment
+        bool excluded = false;
+        for (const auto &rx : excludeGlobs) {
+            for (const auto &segment : segments) {
+                if (rx.match(segment).hasMatch()) {
+                    excluded = true;
                     break;
                 }
             }
-            if (!ok) {
+            if (excluded) {
+                break;
+            }
+        }
+        if (excluded) {
+            continue;
+        }
+
+        // Show: partial substring match per segment (case-insensitive)
+        if (!showTokens.isEmpty()) {
+            bool matched = false;
+            for (const auto &token : showTokens) {
+                for (const auto &segment : segments) {
+                    if (segment.toLower().contains(token)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (matched) {
+                    break;
+                }
+            }
+            if (!matched) {
                 continue;
             }
         }
 
         chunk << rel;
-        ++count;
-        if (count % 200 == 0) {
+
+        if (++count % 200 == 0) {
             QCoreApplication::processEvents();
         }
     }
