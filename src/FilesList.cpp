@@ -1,10 +1,14 @@
 #include "FilesList.hpp"
 
-#include <QLabel>
 #include <QDir>
-#include <QFileInfo>
-#include <QRegularExpression>
+#include <QDebug>
 #include <QElapsedTimer>
+#include <QFileInfo>
+#include <QLabel>
+#include <QRegularExpression>
+
+// Set to 0 to use regex instead of glob
+#define USE_GLOB_MATCHING 0
 
 FilesList::FilesList(QWidget* parent)
     : QWidget(parent)
@@ -96,6 +100,8 @@ void FilesList::updateList() {
     const QStringList excludePatterns = excludeStr.split(';', Qt::SkipEmptyParts);
     const QStringList showPatterns = showStr.split(';', Qt::SkipEmptyParts);
 
+#if !USE_GLOB_MATCHING
+    // Convert glob-like input into regex list
     auto toRegexList = [](const QStringList& patterns) {
         QList<QRegularExpression> regexList;
         for (const auto& pattern : patterns) {
@@ -109,6 +115,7 @@ void FilesList::updateList() {
 
     const auto excludeRegexes = toRegexList(excludePatterns);
     const auto showRegexes = toRegexList(showPatterns);
+#endif
 
     for (const QString& rel : allFiles) {
         const QString relLower = rel.toLower();
@@ -118,38 +125,42 @@ void FilesList::updateList() {
 
         // --- EXCLUDE FILTER ---
         bool excluded = false;
-        for (const QString& ex : excludePatterns) {
-            const QString trimmed = ex.trimmed().toLower();
-            if (trimmed.isEmpty())
+        for (const QString& pattern : excludePatterns) {
+            const QString p = pattern.trimmed().toLower();
+            if (p.isEmpty())
                 continue;
 
-            // Exact component match only (no substring)
-            if (components.contains(trimmed)) {
+            // Component match
+            if (components.contains(p)) {
                 excluded = true;
                 break;
             }
 
-            // Exact full relative path match only
-            if (relLower == trimmed) {
+            // Full relative path match
+            if (relLower == p) {
                 excluded = true;
                 break;
             }
 
-            // Exact filename match only
-            if (fileNameLower == trimmed) {
+            // Filename exact match
+            if (fileNameLower == p) {
                 excluded = true;
                 break;
             }
-        }
 
-        // Glob pattern exclude match on full path or filename
-        if (!excluded) {
+#if USE_GLOB_MATCHING
+            if (QDir::match(p, relLower) || QDir::match(p, fileNameLower)) {
+                excluded = true;
+                break;
+            }
+#else
             for (const auto& rx : excludeRegexes) {
                 if (rx.match(rel).hasMatch() || rx.match(fi.fileName()).hasMatch()) {
                     excluded = true;
                     break;
                 }
             }
+#endif
         }
 
         if (excluded)
@@ -160,25 +171,29 @@ void FilesList::updateList() {
             bool matched = false;
 
             for (const QString& pattern : showPatterns) {
-                const QString trimmed = pattern.trimmed().toLower();
-                if (trimmed.isEmpty())
+                const QString p = pattern.trimmed().toLower();
+                if (p.isEmpty())
                     continue;
 
-                // Substring or exact match in full path (this part is substring as original, can adjust if needed)
-                if (relLower.contains(trimmed) || relLower == trimmed) {
+                // Exact full match
+                if (relLower == p || fileNameLower == p) {
                     matched = true;
                     break;
                 }
-            }
 
-            // Glob match on full path or filename
-            if (!matched) {
+#if USE_GLOB_MATCHING
+                if (QDir::match(p, relLower) || QDir::match(p, fileNameLower)) {
+                    matched = true;
+                    break;
+                }
+#else
                 for (const auto& rx : showRegexes) {
                     if (rx.match(rel).hasMatch() || rx.match(fi.fileName()).hasMatch()) {
                         matched = true;
                         break;
                     }
                 }
+#endif
             }
 
             if (!matched)
@@ -191,5 +206,6 @@ void FilesList::updateList() {
     emit filtersChanged();
 
     qint64 elapsedMs = timer.elapsed();
-    qDebug("FilesList::updateList took %lld ms", elapsedMs);
+    qDebug("FilesList::updateList took %lld ms (using %s)", elapsedMs,
+           USE_GLOB_MATCHING ? "GLOB" : "REGEX");
 }
