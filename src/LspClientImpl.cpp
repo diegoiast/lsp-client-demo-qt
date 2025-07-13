@@ -4,35 +4,38 @@
 #include "LspClientImpl.hpp"
 #include "lsp/fileuri.h"
 
-
 LspClientImpl::LspClientImpl() {}
 
-void LspClientImpl::debugIO(bool enable) {
-	(void)enable;
-}
+void LspClientImpl::debugIO(bool enable) { (void)enable; }
 
 void LspClientImpl::setDocumentRoot(const std::string &newRoot) {
     m_documentRoot = newRoot;
     initializeLspServer();
 }
 
-void LspClientImpl::openDocument(const std::string &fileName, const std::string &fileContents)
-{
+void LspClientImpl::openDocument(const std::string &fileName, const std::string &fileContents) {
+    if (!m_running) {
+        return;
+    }
     // When opening a file:
-     lsp::notifications::TextDocument_DidOpen::Params params{
+    lsp::notifications::TextDocument_DidOpen::Params params{
         .textDocument = {
             .uri = lsp::FileUri::fromPath(fileName),
             .languageId = "cpp", // or "c", "python", etc.
             .version = 1,
             .text = fileContents // The full text of the opened file
-        }
-    };
+        }};
     m_messageHandler->sendNotification<lsp::notifications::TextDocument_DidOpen>(std::move(params));
-
 }
 
-void LspClientImpl::hover(const std::string &fileName, int line, int column, std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback)
-{
+void LspClientImpl::hover(
+    const std::string &fileName, int line, int column,
+    std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback) {
+
+    if (!m_running) {
+        return;
+    }
+
     lsp::HoverParams params;
     params.textDocument.uri = lsp::FileUri::fromPath(fileName);
     params.position.line = line;
@@ -40,13 +43,11 @@ void LspClientImpl::hover(const std::string &fileName, int line, int column, std
     // params.workDoneToken
 
     m_messageHandler->sendRequest<lsp::requests::TextDocument_Hover>(
-        std::move(params), [callback = std::move(callback)](auto result) {
-            callback(std::move(result));
-        },
+        std::move(params),
+        [callback = std::move(callback)](auto result) { callback(std::move(result)); },
         [](const lsp::Error &error) {
             std::cerr << "Failed to get response from LSP server: " << error.what() << std::endl;
-        }
-    );
+        });
 }
 
 LspClientImpl::~LspClientImpl() {
@@ -55,11 +56,18 @@ LspClientImpl::~LspClientImpl() {
 }
 
 void LspClientImpl::startClangd() {
-    m_clandIO  = std::make_unique<lsp::Process>("/usr/bin/clangd");
-    m_connection = std::make_unique<lsp::Connection>(m_clandIO->stdIO());
-    m_messageHandler = std::make_unique<lsp::MessageHandler>(*m_connection);
-    m_running = true;
-    m_workerThread = std::thread(&LspClientImpl::runLoop, this);
+    try {
+#if defined(WIN32)
+        m_clandIO = std::make_unique<lsp::Process>("C :\\Program Files\\LLVM\\bin\\clangd.exe");
+#elif defined(POSIX)
+        m_clandIO = std::make_unique<lsp::Process>("/usr/bin/clangd");
+#endif
+        m_connection = std::make_unique<lsp::Connection>(m_clandIO->stdIO());
+        m_messageHandler = std::make_unique<lsp::MessageHandler>(*m_connection);
+        m_running = true;
+        m_workerThread = std::thread(&LspClientImpl::runLoop, this);
+    } catch (lsp::ProcessError e) {
+    }
 }
 
 void LspClientImpl::stopClangd() {
@@ -71,6 +79,10 @@ void LspClientImpl::stopClangd() {
 }
 
 void LspClientImpl::initializeLspServer() {
+    if (!m_running) {
+        return;
+    }
+
     auto initializeParams = lsp::requests::Initialize::Params{};
     initializeParams.rootUri = lsp::FileUri::fromPath(m_documentRoot);
     initializeParams.capabilities = {};
@@ -111,8 +123,7 @@ void LspClientImpl::initializeLspServer() {
 #endif
 }
 
-void LspClientImpl::shutdownLspServer() {
-}
+void LspClientImpl::shutdownLspServer() {}
 
 void LspClientImpl::runLoop() {
     while (m_running) {
