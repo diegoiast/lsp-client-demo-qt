@@ -48,13 +48,15 @@ void FileScannerWorker::start() {
     timer.start();
     QStringList collected;
     scanDir(rootDir, collected);
-    emit filesFound(collected);
     emit finished(timer.elapsed());
 }
 
 void FileScannerWorker::scanDir(const QString &rootPath, QStringList &buf) {
+    QStringList chunk;
+    const int chunkSize = 200;
     QQueue<QString> queue;
     queue.enqueue(rootPath);
+
     while (!queue.isEmpty()) {
         auto dirPath = queue.dequeue();
         QDir dir(dirPath);
@@ -65,13 +67,19 @@ void FileScannerWorker::scanDir(const QString &rootPath, QStringList &buf) {
                 queue.enqueue(normalizePath(fi.absoluteFilePath()));
             } else {
                 auto rel = QDir(rootDir).relativeFilePath(fi.absoluteFilePath());
-                buf << normalizePath(rel);
+                chunk << normalizePath(rel);
+                if (chunk.size() >= chunkSize) {
+                    emit filesChunkFound(chunk);
+                    chunk.clear();
+                    QThread::msleep(20);
+                }
             }
         }
     }
+    if (!chunk.isEmpty()) {
+        emit filesChunkFound(chunk);
+    }
 }
-
-// ========================= FilesList =========================
 
 FilesList::FilesList(QWidget *parent) : QWidget(parent) {
     auto layout = new QVBoxLayout(this);
@@ -106,29 +114,31 @@ void FilesList::setDir(const QString &dir) {
     auto *worker = new FileScannerWorker;
     worker->moveToThread(thread);
     worker->setRootDir(dir);
-
-    connect(thread, &QThread::started, worker, &FileScannerWorker::start);
-    connect(worker, &FileScannerWorker::filesFound, this, [=](const QStringList &files) {
-        allFiles = files;
-        scheduleUpdateList();
+    connect(worker, &FileScannerWorker::filesChunkFound, this, [=](const QStringList &chunk) {
+        fullList.append(chunk);
+        updateListChunked(chunk);
     });
     connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
-        qDebug() << "Scan finished in" << ms << "ms";
-        worker->deleteLater();
-        thread->quit();
+        connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
+            qDebug() << "Scan finished in" << ms << "ms";
+            updateList();
+            worker->deleteLater();
+            thread->quit();
+        });
     });
+    connect(thread, &QThread::started, worker, &FileScannerWorker::start);
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
-
     thread->start();
 }
 
 void FilesList::setFiles(const QStringList &files) {
-    allFiles = files;
+    fullList = files;
     scheduleUpdateList();
 }
 
 void FilesList::clear() {
-    allFiles.clear();
+    fullList.clear();
+    filteredList.clear();
     list->clear();
     directory.clear();
 }
@@ -143,22 +153,76 @@ QStringList FilesList::currentFilteredFiles() const {
 
 void FilesList::scheduleUpdateList() { updateTimer->start(); }
 
+void FilesList::updateListChunked(const QStringList &newFiles) {
+    auto excludes = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
+    auto shows = toRegexList(showEdit->text().split(';', Qt::SkipEmptyParts));
+    auto filteredChunk = QStringList();
+
+    for (const auto &rel : newFiles) {
+        auto normPath = normalizePath(rel).toLower();
+        auto segments = normPath.split('/', Qt::SkipEmptyParts);
+        auto excluded = false;
+
+        for (auto const &rx : excludes) {
+            for (const auto &segment : segments) {
+                if (rx.match(segment).hasMatch()) {
+                    excluded = true;
+                    break;
+                }
+            }
+            if (excluded) {
+                break;
+            }
+        }
+        if (excluded) {
+            continue;
+        }
+
+        if (!shows.isEmpty()) {
+            bool matched = false;
+            for (auto const &rx : shows) {
+                for (auto const &segment : segments) {
+                    if (rx.match(segment).hasMatch() ||
+                        segment.contains(rx.pattern(), Qt::CaseInsensitive)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (matched) {
+                    break;
+                }
+            }
+            if (!matched) {
+                continue;
+            }
+        }
+
+        filteredChunk << rel;
+    }
+
+    filteredChunk.sort(Qt::CaseInsensitive);
+    for (auto const &rel : filteredChunk) {
+        auto *item = new QListWidgetItem(QDir::toNativeSeparators(rel));
+        item->setToolTip(QDir::toNativeSeparators(directory + rel));
+        list->addItem(item);
+    }
+
+    filteredList.append(filteredChunk);
+}
+
 void FilesList::updateList() {
+    auto const excludeGlobs = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
+    auto const showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
+    auto chunk = QStringList();
+    auto count = 0;
+
     list->clear();
+    for (const auto &rel : fullList) {
+        auto const normPath = normalizePath(rel);
+        auto const segments = normPath.split('/', Qt::SkipEmptyParts);
+        auto const fileName = QFileInfo(normPath).fileName();
 
-    const auto excludeGlobs = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
-    const auto showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
-
-    QStringList chunk;
-    int count = 0;
-
-    for (const auto &rel : allFiles) {
-        const auto normPath = normalizePath(rel);
-        const auto segments = normPath.split('/', Qt::SkipEmptyParts);
-        const auto fileName = QFileInfo(normPath).fileName();
-
-        // Exclude: exact glob-style match per segment
-        bool excluded = false;
+        auto excluded = false;
         for (const auto &rx : excludeGlobs) {
             for (const auto &segment : segments) {
                 if (rx.match(segment).hasMatch()) {
@@ -174,7 +238,6 @@ void FilesList::updateList() {
             continue;
         }
 
-        // Show: partial substring match per segment (case-insensitive)
         if (!showTokens.isEmpty()) {
             bool matched = false;
             for (const auto &token : showTokens) {
@@ -200,8 +263,8 @@ void FilesList::updateList() {
         }
     }
 
-    chunk.sort();
-    for (const auto &rel : chunk) {
+    chunk.sort(Qt::CaseInsensitive);
+    for (auto const &rel : chunk) {
         auto *item = new QListWidgetItem(QDir::toNativeSeparators(rel));
         item->setToolTip(QDir::toNativeSeparators(directory + rel));
         list->addItem(item);

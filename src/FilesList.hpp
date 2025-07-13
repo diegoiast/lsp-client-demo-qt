@@ -21,29 +21,14 @@ class FileScannerWorker : public QObject {
     void start();
 
   signals:
-    void filesFound(const QStringList &files);
+
+    void filesChunkFound(const QStringList &chunk);
     void finished(qint64 elapsedMs);
 
   private:
     void scanDir(const QString &rootPath, QStringList &buffer);
     QString rootDir;
 };
-
-#if 0
-class FileFilterWorker : public QObject {
-    Q_OBJECT
-  public:
-    explicit FileFilterWorker(QObject *parent = nullptr);
-
-  public slots:
-    // void processFilter(const QStringList &files, const QStringList &excludePatterns,
-    // const QStringList &showPatterns);
-
-  signals:
-    void filteredFilesChunk(const QStringList &chunk);
-    void filteringFinished();
-};
-#endif
 
 class FilesList : public QWidget {
     Q_OBJECT
@@ -64,6 +49,7 @@ class FilesList : public QWidget {
   private slots:
     void updateList();
     void scheduleUpdateList();
+    void updateListChunked(const QStringList &newFiles);
 
   private:
     QListWidget *list = nullptr;
@@ -71,7 +57,8 @@ class FilesList : public QWidget {
     QLineEdit *showEdit = nullptr;
 
     QString directory;
-    QStringList allFiles;
+    QStringList fullList;
+    QStringList filteredList;
 
     QThread *filterThread = nullptr;
     FileFilterWorker *filterWorker = nullptr;
