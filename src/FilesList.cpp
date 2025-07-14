@@ -92,13 +92,21 @@ FilesList::FilesList(QWidget *parent) : QWidget(parent) {
     showEdit = new QLineEdit(this);
     loadingWidget = new LoadingWidget(this);
 
+    list->setAlternatingRowColors(true);
+
+    showEdit->setClearButtonEnabled(true);
+    showEdit->setPlaceholderText(tr("Files to show (e.g. main;*.cpp;*.h)"));
+    showEdit->setToolTip(showEdit->placeholderText());
+
+    excludeEdit->setClearButtonEnabled(true);
     excludeEdit->setText("build;.vs;cbuild*");
-    showEdit->setPlaceholderText("Show (e.g. *.cpp;*.h)");
+    excludeEdit->setPlaceholderText(tr("Files to hide (e.g. build;*.o*;.git)"));
+    excludeEdit->setToolTip(excludeEdit->placeholderText());
 
     layout->addWidget(loadingWidget);
     layout->addWidget(list);
-    layout->addWidget(excludeEdit);
     layout->addWidget(showEdit);
+    layout->addWidget(excludeEdit);
 
     connect(list, &QListWidget::itemClicked, this,
             [=](auto *it) { emit fileSelected(it->text()); });
@@ -125,7 +133,7 @@ void FilesList::setDir(const QString &dir) {
             [=]() {
                 fullList.append(chunk);
                 loadingWidget->setToolTip(QString(tr("Total %1 files")).arg(fullList.size()));
-                updateList(chunk, /*clear=*/false);
+                updateList(chunk, false);
             },
             Qt::QueuedConnection);
     });
