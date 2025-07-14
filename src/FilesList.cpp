@@ -120,9 +120,14 @@ void FilesList::setDir(const QString &dir) {
     worker->moveToThread(thread);
     worker->setRootDir(dir);
     connect(worker, &FileScannerWorker::filesChunkFound, this, [=](const QStringList &chunk) {
-        fullList.append(chunk);
-        loadingWidget->setToolTip(QString(tr("Total %1 files")).arg(fullList.size()));
-        updateList(chunk, false);
+        QMetaObject::invokeMethod(
+            this,
+            [=]() {
+                fullList.append(chunk);
+                loadingWidget->setToolTip(QString(tr("Total %1 files")).arg(fullList.size()));
+                updateList(chunk, /*clear=*/false);
+            },
+            Qt::QueuedConnection);
     });
     connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
         qDebug() << "Scan finished in" << ms << "ms";
@@ -164,15 +169,15 @@ void FilesList::scheduleUpdateList() {
 }
 
 void FilesList::updateList(const QStringList &files, bool clearList) {
-    if (clearList) {
-        list->clear();
-    }
-
     auto excludes = toRegexList(excludeEdit->text().split(';', Qt::SkipEmptyParts));
     auto shows = toRegexList(showEdit->text().split(';', Qt::SkipEmptyParts));
     auto showTokens = showEdit->text().toLower().split(';', Qt::SkipEmptyParts);
     auto filtered = QStringList();
     auto count = 0;
+
+    if (clearList) {
+        list->clear();
+    }
 
     for (auto const &rel : files) {
         auto normPath = normalizePath(rel);
