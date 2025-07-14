@@ -126,7 +126,6 @@ void FilesList::setDir(const QString &dir) {
     });
     connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
         qDebug() << "Scan finished in" << ms << "ms";
-        updateList(fullList, true);
         worker->deleteLater();
         thread->quit();
         loadingWidget->stop();
