@@ -1,10 +1,13 @@
 ﻿#include "FilesList.hpp"
+#include "LoadingWidget.hpp"
 
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include <QLineEdit>
+#include <QListWidget>
 #include <QQueue>
 #include <QRegularExpression>
 #include <QThread>
@@ -84,13 +87,15 @@ void FileScannerWorker::scanDir(const QString &rootPath, QStringList &buf) {
 FilesList::FilesList(QWidget *parent) : QWidget(parent) {
     auto layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    list = new QListWidget;
-    excludeEdit = new QLineEdit;
-    showEdit = new QLineEdit;
+    list = new QListWidget(this);
+    excludeEdit = new QLineEdit(this);
+    showEdit = new QLineEdit(this);
+    loadingWidget = new LoadingWidget(this);
 
     excludeEdit->setText("build;.vs;cbuild*");
     showEdit->setPlaceholderText("Show (e.g. *.cpp;*.h)");
 
+    layout->addWidget(loadingWidget);
     layout->addWidget(list);
     layout->addWidget(excludeEdit);
     layout->addWidget(showEdit);
@@ -116,19 +121,21 @@ void FilesList::setDir(const QString &dir) {
     worker->setRootDir(dir);
     connect(worker, &FileScannerWorker::filesChunkFound, this, [=](const QStringList &chunk) {
         fullList.append(chunk);
+        loadingWidget->setToolTip(QString(tr("Total %1 files")).arg(fullList.size()));
         updateList(chunk, false);
     });
     connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
-        connect(worker, &FileScannerWorker::finished, this, [=](qint64 ms) {
-            qDebug() << "Scan finished in" << ms << "ms";
-            updateList(fullList, true);
-            worker->deleteLater();
-            thread->quit();
-        });
+        qDebug() << "Scan finished in" << ms << "ms";
+        updateList(fullList, true);
+        worker->deleteLater();
+        thread->quit();
+        loadingWidget->stop();
     });
     connect(thread, &QThread::started, worker, &FileScannerWorker::start);
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
     thread->start();
+    loadingWidget->start();
+    loadingWidget->setToolTip({});
 }
 
 void FilesList::setFiles(const QStringList &files) {

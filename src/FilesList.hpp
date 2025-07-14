@@ -1,15 +1,16 @@
 #ifndef FILESLIST_HPP
 #define FILESLIST_HPP
 
-#include <QLineEdit>
-#include <QListWidget>
 #include <QStringList>
 #include <QThread>
 #include <QTimer>
 #include <QWidget>
 
+class QLineEdit;
+class QListWidget;
 class FileScannerWorker;
 class FileFilterWorker;
+class LoadingWidget;
 
 class FileScannerWorker : public QObject {
     Q_OBJECT
@@ -51,6 +52,7 @@ class FilesList : public QWidget {
     void updateList(const QStringList &files, bool clearList);
 
   private:
+    LoadingWidget *loadingWidget = nullptr;
     QListWidget *list = nullptr;
     QLineEdit *excludeEdit = nullptr;
     QLineEdit *showEdit = nullptr;
