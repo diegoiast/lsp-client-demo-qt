@@ -2,27 +2,19 @@
 #include <QCoreApplication>
 #include <QThread>
 #ifdef _WIN32
-#include <io.h>
-#include <fcntl.h>
 #include <QTimer>
+#include <fcntl.h>
+#include <io.h>
 #else
-#include <unistd.h>
 #include <QSocketNotifier>
+#include <unistd.h>
 #endif
 
-AppOutputRedirector::AppOutputRedirector(QObject* parent)
-    : QObject(parent)
-{
-    setup();
-}
+AppOutputRedirector::AppOutputRedirector(QObject *parent) : QObject(parent) { setup(); }
 
-AppOutputRedirector::~AppOutputRedirector()
-{
-    cleanup();
-}
+AppOutputRedirector::~AppOutputRedirector() { cleanup(); }
 
-void AppOutputRedirector::setup()
-{
+void AppOutputRedirector::setup() {
 #ifdef _WIN32
     // stdout
     if (_pipe(outPipe, 4096, _O_BINARY) == 0) {
@@ -31,8 +23,9 @@ void AppOutputRedirector::setup()
         connect(outTimer, &QTimer::timeout, this, [this]() {
             char buf[4096];
             int n = _read(outPipe[0], buf, sizeof(buf));
-            if (n > 0)
+            if (n > 0) {
                 emit newStdout(QString::fromLocal8Bit(buf, n));
+            }
         });
         outTimer->start(100);
     }
@@ -43,8 +36,9 @@ void AppOutputRedirector::setup()
         connect(errTimer, &QTimer::timeout, this, [this]() {
             char buf[4096];
             int n = _read(errPipe[0], buf, sizeof(buf));
-            if (n > 0)
+            if (n > 0) {
                 emit newStderr(QString::fromLocal8Bit(buf, n));
+            }
         });
         errTimer->start(100);
     }
@@ -56,8 +50,9 @@ void AppOutputRedirector::setup()
         connect(outNotifier, &QSocketNotifier::activated, this, [this](int) {
             char buf[4096];
             ssize_t n = ::read(outPipe[0], buf, sizeof(buf));
-            if (n > 0)
+            if (n > 0) {
                 emit newStdout(QString::fromLocal8Bit(buf, n));
+            }
         });
     }
     // stderr
@@ -67,28 +62,52 @@ void AppOutputRedirector::setup()
         connect(errNotifier, &QSocketNotifier::activated, this, [this](int) {
             char buf[4096];
             ssize_t n = ::read(errPipe[0], buf, sizeof(buf));
-            if (n > 0)
+            if (n > 0) {
                 emit newStderr(QString::fromLocal8Bit(buf, n));
+            }
         });
     }
 #endif
 }
 
-void AppOutputRedirector::cleanup()
-{
+void AppOutputRedirector::cleanup() {
 #ifdef _WIN32
-    if (outTimer) outTimer->stop();
-    if (errTimer) errTimer->stop();
-    if (outPipe[0] != -1) _close(outPipe[0]);
-    if (outPipe[1] != -1) _close(outPipe[1]);
-    if (errPipe[0] != -1) _close(errPipe[0]);
-    if (errPipe[1] != -1) _close(errPipe[1]);
+    if (outTimer) {
+        outTimer->stop();
+    }
+    if (errTimer) {
+        errTimer->stop();
+    }
+    if (outPipe[0] != -1) {
+        _close(outPipe[0]);
+    }
+    if (outPipe[1] != -1) {
+        _close(outPipe[1]);
+    }
+    if (errPipe[0] != -1) {
+        _close(errPipe[0]);
+    }
+    if (errPipe[1] != -1) {
+        _close(errPipe[1]);
+    }
 #else
-    if (outNotifier) outNotifier->setEnabled(false);
-    if (errNotifier) errNotifier->setEnabled(false);
-    if (outPipe[0] != -1) ::close(outPipe[0]);
-    if (outPipe[1] != -1) ::close(outPipe[1]);
-    if (errPipe[0] != -1) ::close(errPipe[0]);
-    if (errPipe[1] != -1) ::close(errPipe[1]);
+    if (outNotifier) {
+        outNotifier->setEnabled(false);
+    }
+    if (errNotifier) {
+        errNotifier->setEnabled(false);
+    }
+    if (outPipe[0] != -1) {
+        ::close(outPipe[0]);
+    }
+    if (outPipe[1] != -1) {
+        ::close(outPipe[1]);
+    }
+    if (errPipe[0] != -1) {
+        ::close(errPipe[0]);
+    }
+    if (errPipe[1] != -1) {
+        ::close(errPipe[1]);
+    }
 #endif
 }

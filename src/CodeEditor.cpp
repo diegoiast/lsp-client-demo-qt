@@ -3,35 +3,31 @@
 #include <QTextCursor>
 #include <QToolTip>
 
-CodeEditor::CodeEditor(QWidget* parent)
-    : QPlainTextEdit(parent)
-{
+CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent) {
     setMouseTracking(true);
-    
+
     auto monospacedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     monospacedFont.setFixedPitch(true);
     setFont(monospacedFont);
 }
 
-bool CodeEditor::event(QEvent* e)
-{
+bool CodeEditor::event(QEvent *e) {
     if (e->type() == QEvent::ToolTip) {
-        auto helpEvent = static_cast<QHelpEvent*>(e);
+        auto helpEvent = static_cast<QHelpEvent *>(e);
         auto cursor = cursorForPosition(helpEvent->pos());
         cursor.select(QTextCursor::WordUnderCursor);
         auto word = cursor.selectedText();
-        
+
         if (lastWordHovered != word) {
             auto line = cursor.blockNumber();
             auto col = cursor.positionInBlock();
             lastWordHovered = word;
             emit hoveredWordTooltip(word, line, col, helpEvent->globalPos());
-/*    
-            if (!word.isEmpty())
-                QToolTip::showText(helpEvent->globalPos(), QString("'%1' (Line %2, Col %3)").arg(word).arg(line).arg(col), this);
-            else
-                QToolTip::hideText();
-*/  
+            /*
+                        if (!word.isEmpty())
+                            QToolTip::showText(helpEvent->globalPos(), QString("'%1' (Line %2, Col
+               %3)").arg(word).arg(line).arg(col), this); else QToolTip::hideText();
+            */
             return true;
         }
     }

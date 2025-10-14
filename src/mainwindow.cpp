@@ -41,12 +41,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     toolbar = addToolBar("Main Toolbar");
     toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     openDirAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ListAdd), tr("Open Dir"));
-    closeDirAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ListRemove),tr("Close Dir"));
-    closeTabAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::WindowClose) ,tr("Close Tab"));
-    showDebugAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::DialogQuestion),tr("Debug"));
+    closeDirAction =
+        toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ListRemove), tr("Close Dir"));
+    closeTabAction =
+        toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::WindowClose), tr("Close Tab"));
+    showDebugAction =
+        toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::DialogQuestion), tr("Debug"));
     showDebugAction->setCheckable(true);
-    clearDebugAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::EditClear), tr("Clear Debug"));
-    quitAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ApplicationExit), tr("Quit"));
+    clearDebugAction =
+        toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::EditClear), tr("Clear Debug"));
+    quitAction =
+        toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ApplicationExit), tr("Quit"));
 
     outputEdit = new QTextEdit(this);
     outputEdit->setReadOnly(true);

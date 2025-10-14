@@ -1,16 +1,16 @@
 #pragma once
 
-#include <QMainWindow>
-#include <QListWidget>
-#include <QTabWidget>
-#include <QToolBar>
 #include <QAction>
-#include <QShortcut>
 #include <QDockWidget>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QMainWindow>
+#include <QShortcut>
 #include <QStringList>
-#include <QVBoxLayout>
+#include <QTabWidget>
 #include <QTextEdit>
+#include <QToolBar>
+#include <QVBoxLayout>
 
 #include "LspClientImpl.hpp"
 
@@ -19,38 +19,38 @@ class FilesList;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
-public:
-    MainWindow(QWidget* parent = nullptr);
+  public:
+    MainWindow(QWidget *parent = nullptr);
 
-private:
-    QTabWidget* tabWidget;
-    QToolBar* toolbar;
-    QAction* openDirAction;
-    QAction* closeDirAction;
-    QAction* quitAction;
-    QAction* closeTabAction;
-    QAction* showDebugAction;
-    QAction* clearDebugAction;
-    QShortcut* closeTabShortcut;
-    QDockWidget* dock;
+  private:
+    QTabWidget *tabWidget;
+    QToolBar *toolbar;
+    QAction *openDirAction;
+    QAction *closeDirAction;
+    QAction *quitAction;
+    QAction *closeTabAction;
+    QAction *showDebugAction;
+    QAction *clearDebugAction;
+    QShortcut *closeTabShortcut;
+    QDockWidget *dock;
     QString projectDir;
-    QDockWidget* outputDock;
-    QTextEdit* outputEdit;
+    QDockWidget *outputDock;
+    QTextEdit *outputEdit;
 
-    FilesList* filesList = nullptr;
-    AppOutputRedirector* outputRedirector = nullptr;
+    FilesList *filesList = nullptr;
+    AppOutputRedirector *outputRedirector = nullptr;
     LspClientImpl lspClient;
 
     void openDirectory();
-    void loadFiles(const QString& dirPath);
-    void addFilesRecursive(const QString& baseDir, const QString& currentDir, QStringList& files);
-    void openFileInTab(const QString& relPath);
+    void loadFiles(const QString &dirPath);
+    void addFilesRecursive(const QString &baseDir, const QString &currentDir, QStringList &files);
+    void openFileInTab(const QString &relPath);
     void closeDirectory();
     void closeCurrentTab();
-    void appendStdout(const QString& text);
-    void appendStderr(const QString& text);
+    void appendStdout(const QString &text);
+    void appendStderr(const QString &text);
 
-private slots:
+  private slots:
     void onOpenDirClicked();
     void onCloseDirClicked();
     void onQuitClicked();

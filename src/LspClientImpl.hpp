@@ -5,12 +5,11 @@
 #include <memory>
 #include <string>
 
-#include <lsp/process.h>
-#include <lsp/io/stream.h>
 #include <lsp/connection.h>
+#include <lsp/io/stream.h>
 #include <lsp/messagehandler.h>
 #include <lsp/messages.h>
-
+#include <lsp/process.h>
 
 class LspClientImpl {
   public:
@@ -27,7 +26,8 @@ class LspClientImpl {
 
     void setDocumentRoot(const std::string &documentRoot);
     void openDocument(const std::string &fileName, const std::string &fileContents);
-    void hover(const std::string &fileName, int line, int column, std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback);
+    void hover(const std::string &fileName, int line, int column,
+               std::function<void(lsp::requests::TextDocument_Hover::Result &&result)> callback);
 
     void startClangd();
     void stopClangd();
