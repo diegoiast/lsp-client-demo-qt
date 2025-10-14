@@ -109,7 +109,7 @@ FilesList::FilesList(QWidget *parent) : QWidget(parent) {
     layout->addWidget(excludeEdit);
 
     connect(list, &QListWidget::itemClicked, this,
-            [=](auto *it) { emit fileSelected(it->text()); });
+            [this](auto *it) { emit fileSelected(it->text()); });
     connect(excludeEdit, &QLineEdit::textChanged, this, &FilesList::scheduleUpdateList);
     connect(showEdit, &QLineEdit::textChanged, this, &FilesList::scheduleUpdateList);
 
@@ -127,10 +127,10 @@ void FilesList::setDir(const QString &dir) {
     auto *worker = new FileScannerWorker;
     worker->moveToThread(thread);
     worker->setRootDir(dir);
-    connect(worker, &FileScannerWorker::filesChunkFound, this, [=](const QStringList &chunk) {
+    connect(worker, &FileScannerWorker::filesChunkFound, this, [this](const QStringList &chunk) {
         QMetaObject::invokeMethod(
             this,
-            [=]() {
+            [this, chunk]() {
                 fullList.append(chunk);
                 loadingWidget->setToolTip(QString(tr("Total %1 files")).arg(fullList.size()));
                 updateList(chunk, false);
