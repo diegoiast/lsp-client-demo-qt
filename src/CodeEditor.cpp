@@ -7,6 +7,10 @@ CodeEditor::CodeEditor(QWidget* parent)
     : QPlainTextEdit(parent)
 {
     setMouseTracking(true);
+    
+    auto monospacedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    monospacedFont.setFixedPitch(true);
+    setFont(monospacedFont);
 }
 
 bool CodeEditor::event(QEvent* e)
