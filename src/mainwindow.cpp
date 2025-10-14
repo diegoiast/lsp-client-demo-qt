@@ -39,13 +39,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     addDockWidget(Qt::LeftDockWidgetArea, dock);
 
     toolbar = addToolBar("Main Toolbar");
-    openDirAction = toolbar->addAction(tr("Open Dir"));
-    closeDirAction = toolbar->addAction(tr("Close Dir"));
-    closeTabAction = toolbar->addAction(tr("Close Tab"));
-    showDebugAction = toolbar->addAction(tr("Debug"));
+    toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    openDirAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ListAdd), tr("Open Dir"));
+    closeDirAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ListRemove),tr("Close Dir"));
+    closeTabAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::WindowClose) ,tr("Close Tab"));
+    showDebugAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::DialogQuestion),tr("Debug"));
     showDebugAction->setCheckable(true);
-    clearDebugAction = toolbar->addAction(tr("Clear Debug"));
-    quitAction = toolbar->addAction(tr("Quit"));
+    clearDebugAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::EditClear), tr("Clear Debug"));
+    quitAction = toolbar->addAction(QIcon::fromTheme(QIcon::ThemeIcon::ApplicationExit), tr("Quit"));
 
     outputEdit = new QTextEdit(this);
     outputEdit->setReadOnly(true);
@@ -55,11 +56,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     outputDock->setWidget(outputEdit);
     addDockWidget(Qt::RightDockWidgetArea, outputDock);
 
-    /*
     outputRedirector = new AppOutputRedirector(this);
     connect(outputRedirector, &AppOutputRedirector::newStdout, this, &MainWindow::appendStdout);
     connect(outputRedirector, &AppOutputRedirector::newStderr, this, &MainWindow::appendStderr);
-    */
 
     connect(openDirAction, &QAction::triggered, this, &MainWindow::onOpenDirClicked);
     connect(closeDirAction, &QAction::triggered, this, &MainWindow::onCloseDirClicked);
