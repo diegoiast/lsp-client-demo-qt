@@ -15,3 +15,4 @@ qt_add_executable(lsp_client_demo_qt WIN32
 )
 
 target_link_libraries(lsp_client_demo_qt PRIVATE Qt6::Widgets lsp)
+set_target_properties(lsp_client_demo_qt PROPERTIES SKIP_RPATH TRUE)
