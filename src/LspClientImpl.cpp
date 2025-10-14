@@ -58,8 +58,8 @@ LspClientImpl::~LspClientImpl() {
 void LspClientImpl::startClangd() {
     try {
 #if defined(WIN32)
-        m_clandIO = std::make_unique<lsp::Process>("C :\\Program Files\\LLVM\\bin\\clangd.exe");
-#elif defined(POSIX)
+        m_clandIO = std::make_unique<lsp::Process>("C:\\Program Files\\LLVM\\bin\\clangd.exe");
+#elif defined(__unix__)
         m_clandIO = std::make_unique<lsp::Process>("/usr/bin/clangd");
 #endif
         m_connection = std::make_unique<lsp::Connection>(m_clandIO->stdIO());
