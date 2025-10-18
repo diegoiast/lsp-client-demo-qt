@@ -60,11 +60,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     outputDock = new QDockWidget(tr("Output"), this);
     outputDock->setWidget(outputEdit);
     addDockWidget(Qt::RightDockWidgetArea, outputDock);
-
+#ifndef __WIN32
     outputRedirector = new AppOutputRedirector(this);
     connect(outputRedirector, &AppOutputRedirector::newStdout, this, &MainWindow::appendStdout);
     connect(outputRedirector, &AppOutputRedirector::newStderr, this, &MainWindow::appendStderr);
-
+#endif
     connect(openDirAction, &QAction::triggered, this, &MainWindow::onOpenDirClicked);
     connect(closeDirAction, &QAction::triggered, this, &MainWindow::onCloseDirClicked);
     connect(closeTabAction, &QAction::triggered, this, &MainWindow::onCloseTabClicked);
